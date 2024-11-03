@@ -1,54 +1,54 @@
-# MLflowX Recipes - Extensible Fork
+# DireWolf Recipes - Unleash the Power of Customizable ML Workflows
 
 ## Overview
 
-Welcome to **MLflowX Recipes - Extensible Fork**, an extended and enhanced continuation of the original MLflow Recipes module. With MLflow's recent decision to discontinue support for Recipes, this project aims to pick up where the MLflow team left off. We not only maintain the existing functionality for classification and regression workflows but also reimagine Recipes as a more flexible and extensible framework for data scientists and developers. The primary goal is to empower you to create new recipe templates that can be easily incorporated, ensuring that MLflow remains a versatile and valuable tool for various machine learning workflows.
+**DireWolf Recipes** originated as a fork of the MLflow Recipes project, evolving beyond its initial capabilities. Building on the solid foundation of MLflow Recipes, this project retains familiar features while enhancing and expanding the framework to allow for greater customization, extensibility, and a broader range of machine learning workflows.
 
-## Why This Fork?
+Welcome to **DireWolf Recipes**, a bold and innovative solution for simplifying and automating machine learning workflow management. Inspired by the adaptability, strength, and community spirit of the wolf, DireWolf Recipes aims to provide a highly extensible and customizable platform that empowers data scientists and machine learning practitioners to build, share, and execute machine learning pipelines effortlessly. Breaking free from the limitations of traditional ML tools, DireWolf Recipes helps you unleash your creativity and conquer complex challenges with versatile workflows that go far beyond basic classification and regression tasks.
 
-The original MLflow Recipes module offered a simplified interface to streamline the model development process for common machine learning tasks, such as classification and regression. However, the lack of support for additional workflows and MLflow's decision to discontinue this feature left a gap for those who relied on Recipes for rapid prototyping and experimentation.
+## Why DireWolf Recipes?
 
-This project takes the core strengths of MLflow Recipes and extends its functionality:
+**DireWolf Recipes** is designed to address the need for extensibility and flexibility in machine learning workflows. In a world where ML projects are growing increasingly diverse and complex, DireWolf Recipes stands out as the ideal framework for practitioners who need more than just pre-defined workflows. Much like a wolf pack that thrives by adapting to its environment, DireWolf Recipes embraces modularity, allowing you to create tailored solutions for a wide variety of challenges.
 
-- **Extensibility by Design**: Recipes are now modular and extensible, allowing developers and data scientists to easily add new workflows, such as time series forecasting, clustering, recommendation systems, and more.
-- **Community-Driven Development**: By fostering a community-driven approach, this fork will continue to grow, adding diverse recipes contributed by developers worldwide.
-- **Ease of Integration**: Maintaining compatibility with the existing MLflow ecosystem, this fork is designed to be easily integrated into your current projects with minimal changes to your workflows.
+- **Extensible by Design**: The recipe structure is completely modular, enabling developers and data scientists to create new workflows such as time series forecasting, anomaly detection, recommendation systems, and more with ease.
+- **Community-Driven Innovation**: DireWolf Recipes fosters a sense of community collaboration, ensuring that the repository evolves with contributions from developers and researchers around the globe. Our ultimate goal is to offer a rich library of ready-made and community-curated recipes.
+- **Ease of Use and Integration**: Built with a focus on compatibility, DireWolf Recipes integrates seamlessly with the existing Python ecosystem, making it easy to incorporate with other popular data science tools.
 
 ## Key Features
 
-- **Support for Custom Recipes**: Unlike the original MLflow Recipes module, which only supported classification and regression, this fork allows users to easily develop and integrate custom recipes. Whether you need a workflow for anomaly detection, natural language processing, or another specialized task, this fork is built with modularity in mind.
+- **Flexible Recipe Management**: Unlike traditional workflows, DireWolf Recipes allows users to create custom recipes without constraints. Whether it's clustering, deep learning, natural language processing, or reinforcement learning, the modularity of DireWolf Recipes makes it straightforward to create and manage diverse tasks.
 
-- **Flexible Recipe Design**: Each recipe is designed to be self-contained and follows a consistent structure, making it easy for developers to understand and extend. This uniformity enables rapid onboarding and consistency across multiple machine learning projects.
+- **Seamless Community Collaboration**: With a community-driven approach, new recipes can be easily shared, peer-reviewed, and integrated into your existing workflow, making DireWolf Recipes an ever-evolving repository of best practices.
 
-- **Backward Compatibility**: Existing classification and regression recipes are maintained in their original form, ensuring that users migrating from MLflow's previous version will experience a seamless transition.
-
-- **Community-Contributed Recipes**: We encourage the community to contribute their recipes to grow the library of supported workflows. We envision a collection of templates that cater to a wide range of machine learning challenges, all in one place.
+- **Ease of Setup and Deployment**: Ready to use out of the box, DireWolf Recipes can be configured and deployed quickly, with minimal overhead. Users can get started in minutes, rapidly prototyping, testing, and iterating on machine learning models.
 
 ## Getting Started
 
 ### Installation
 
-To get started, you can install this fork as a Python package:
+To get started, you can install DireWolf Recipes as a Python package:
 
 ```bash
-pip install git+https://github.com/carlosprados/mlflowx-recipes.git
+pip install git+https://github.com/carlosprados/direwolf-recipes.git
 ```
 
-Make sure you have MLflow installed:
+Make sure you have the necessary dependencies installed:
 
 ```bash
-pip install mlflow
+pip install mlflow numpy pandas scikit-learn
 ```
 
 ### Usage
 
-This fork follows the familiar `mlflow recipes` command-line interface, but with new commands and flags to accommodate extensibility. For example:
+DireWolf Recipes follows a simple yet flexible command-line interface that allows you to define and execute your custom workflows.
+
+To run a predefined recipe:
 
 ```bash
-mlflow recipes run --recipe new_custom_recipe_name
+direwolf-recipes run --recipe new_custom_recipe_name
 ```
 
-You can also create and add your own recipes by following the template available in the `recipes/` directory:
+You can create and add your own recipes by following the template available in the `recipes/` directory:
 
 ```bash
 recipes/
@@ -65,7 +65,7 @@ recipes/
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/carlosprados/mlflowx-recipes.git
+   git clone https://github.com/carlosprados/direwolf-recipes.git
    ```
 
 2. **Define Your Recipe Steps**:
@@ -74,29 +74,27 @@ recipes/
 
 3. **Run Your Recipe**:
    ```bash
-   mlflow recipes run --recipe your_new_recipe_name
+   direwolf-recipes run --recipe your_new_recipe_name
    ```
 
 ## Contributing
 
-Contributions are what make the open-source community such an amazing place to learn, inspire, and create. We welcome contributions from the community to add new recipes, improve documentation, and enhance the core capabilities of the project.
+DireWolf Recipes thrives on community contributions. We welcome developers and data scientists to contribute new recipes, improve the framework, and enhance the existing documentation. Here is how you can contribute:
 
-To contribute:
-
-1. Fork the project.
-2. Create your feature branch (`git checkout -b feature/new-recipe`).
-3. Commit your changes (`git commit -m 'Add new recipe for time series forecasting'`).
-4. Push to the branch (`git push origin feature/new-recipe`).
-5. Open a pull request.
+1. **Fork the Project**.
+2. **Create Your Feature Branch** (`git checkout -b feature/new-recipe`).
+3. **Commit Your Changes** (`git commit -m 'Add new recipe for time series forecasting'`).
+4. **Push to the Branch** (`git push origin feature/new-recipe`).
+5. **Open a Pull Request**.
 
 ## License
 
-This project is licensed under the terms of the Apache License 2.0. See the [LICENSE](./LICENSE) file for details.
+DireWolf Recipes is licensed under the terms of the Apache License 2.0. See the [LICENSE](./LICENSE) file for more details.
 
 ## Contact
 
-For any questions or suggestions, please reach out via the GitHub issues page or submit a pull request. We welcome all feedback and contributions that can help make this project more useful for the community.
+If you have any questions or suggestions, feel free to reach out via the GitHub issues page or submit a pull request. We welcome all forms of feedback and contributions to help improve DireWolf Recipes.
 
 ---
 
-We are excited to continue building upon MLflow's foundational work, with a vision to provide a more adaptable and expansive machine learning recipe framework. Let us know what recipes you'd like to see or contribute, and let's make this a truly versatile tool for all ML practitioners.
+DireWolf Recipes is built with the vision of pushing the boundaries of what is possible in machine learning. We invite you to explore, contribute, and create exciting workflows that help you unleash your inner "wolf"—adapt, evolve, and thrive in the rapidly changing landscape of machine learning. Let us know which recipes you'd like to see, and let's build a strong community-driven resource together.
