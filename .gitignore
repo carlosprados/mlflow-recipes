@@ -163,3 +163,5 @@ cython_debug/
 
 # PyEnv
 .python-version
+docs/*.rst
+docs/_build/**
