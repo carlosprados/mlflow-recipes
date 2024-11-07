@@ -432,20 +432,19 @@ class Recipe:
                 "For example: `recipe: regression/v1`",
                 error_code=INVALID_PARAMETER_VALUE,
             ) from None
-        class_name = recipe
 
         try:
-            recipe_class_module = _get_class_from_string(class_name)
+            recipe_class_module = _get_class_from_string(recipe)
         except Exception as e:
             if isinstance(e, ModuleNotFoundError):
                 raise MlflowException(
-                    f"Failed to find Recipe {class_name}.\n"
+                    f"Failed to find Recipe {recipe}. "
                     f"Please check the correctness of the recipe template setting: {recipe}",
                     error_code=INVALID_PARAMETER_VALUE,
                 ) from None
             else:
                 raise MlflowException(
-                    f"Failed to construct Recipe {class_name}",
+                    f"Failed to construct Recipe {recipe}",
                     error_code=INTERNAL_ERROR,
                 ) from e
 
