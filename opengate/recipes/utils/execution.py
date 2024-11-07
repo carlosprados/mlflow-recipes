@@ -433,7 +433,8 @@ def _create_makefile(recipe_root_path, execution_directory_path, template) -> No
         template: The template to use to generate the makefile.
     """
     makefile_path = os.path.join(execution_directory_path, "Makefile")
-
+    # mlflowx.recipes.anomaly.v1.RecipeImpl
+    template = "/".join(template.replace(".", "/").split("/")[-3:-1])
     if template == "regression/v1" or template == "classification/v1":
         makefile_to_use = _MAKEFILE_FORMAT_STRING
         steps_folder_path = os.path.join(recipe_root_path, "steps")
