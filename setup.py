@@ -22,7 +22,7 @@ setup(
     python_requires=">=3.6",
     entry_points={
         "console_scripts": [
-            "mlflowx-recipes = mlflowx_recipes.cli:main",  # Example of adding a CLI entry point
+            "opengate-ai-recipes = opengate.recipes.cli:commands",  # Example of adding a CLI entry point
         ],
     },
 )

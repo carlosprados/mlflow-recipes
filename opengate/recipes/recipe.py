@@ -24,7 +24,7 @@ from opengate.recipes.utils.execution import (
     run_recipe_step,
 )
 from opengate.recipes.utils.step import display_html
-from direwolf.utils.class_utils import _get_class_from_string
+from opengate.utils.class_utils import _get_class_from_string
 
 _logger = logging.getLogger(__name__)
 
