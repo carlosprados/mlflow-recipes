@@ -166,3 +166,6 @@ cython_debug/
 docs/*.rst
 docs/_build/**
 .idea/
+
+# a)))
+delete_me.py
