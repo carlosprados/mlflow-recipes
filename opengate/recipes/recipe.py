@@ -425,7 +425,7 @@ class Recipe:
         recipe_config = get_recipe_config(
             recipe_root_path=recipe_root_path, profile=profile
         )
-        recipe: str = recipe_config.get("recipe")
+        recipe: str = recipe_config.get("recipe", "")
         if recipe is None:
             raise MlflowException(
                 "The `recipe` property needs to be defined in the `recipe.yaml` file. "
