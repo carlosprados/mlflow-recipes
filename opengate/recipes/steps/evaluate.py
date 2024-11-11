@@ -39,7 +39,7 @@ from mlflow.utils.databricks_utils import (
     get_databricks_env_vars,
     get_databricks_run_url,
 )
-from direwolf.utils.string_utils import strip_prefix
+from opengate.utils.string_utils import strip_prefix
 
 _logger = logging.getLogger(__name__)
 
