@@ -1,33 +1,34 @@
+import json
 import logging
 
 ERROR_CODE_TO_HTTP_STATUS = {
-    ErrorCode.Name(INTERNAL_ERROR): 500,
-    ErrorCode.Name(INVALID_STATE): 500,
-    ErrorCode.Name(DATA_LOSS): 500,
-    ErrorCode.Name(NOT_IMPLEMENTED): 501,
-    ErrorCode.Name(TEMPORARILY_UNAVAILABLE): 503,
-    ErrorCode.Name(DEADLINE_EXCEEDED): 504,
-    ErrorCode.Name(REQUEST_LIMIT_EXCEEDED): 429,
-    ErrorCode.Name(CANCELLED): 499,
-    ErrorCode.Name(RESOURCE_EXHAUSTED): 429,
-    ErrorCode.Name(ABORTED): 409,
-    ErrorCode.Name(RESOURCE_CONFLICT): 409,
-    ErrorCode.Name(ALREADY_EXISTS): 409,
-    ErrorCode.Name(NOT_FOUND): 404,
-    ErrorCode.Name(ENDPOINT_NOT_FOUND): 404,
-    ErrorCode.Name(RESOURCE_DOES_NOT_EXIST): 404,
-    ErrorCode.Name(PERMISSION_DENIED): 403,
-    ErrorCode.Name(CUSTOMER_UNAUTHORIZED): 401,
-    ErrorCode.Name(UNAUTHENTICATED): 401,
-    ErrorCode.Name(BAD_REQUEST): 400,
-    ErrorCode.Name(RESOURCE_ALREADY_EXISTS): 400,
-    ErrorCode.Name(INVALID_PARAMETER_VALUE): 400,
+    "INTERNAL_ERROR": 500,
+    "INVALID_STATE": 500,
+    "DATA_LOSS": 500,
+    "NOT_IMPLEMENTED": 501,
+    "TEMPORARILY_UNAVAILABLE": 503,
+    "DEADLINE_EXCEEDED": 504,
+    "REQUEST_LIMIT_EXCEEDED": 429,
+    "CANCELLED": 499,
+    "RESOURCE_EXHAUSTED": 429,
+    "ABORTED": 409,
+    "RESOURCE_CONFLICT": 409,
+    "ALREADY_EXISTS": 409,
+    "NOT_FOUND": 404,
+    "ENDPOINT_NOT_FOUND": 404,
+    "RESOURCE_DOES_NOT_EXIST": 404,
+    "PERMISSION_DENIED": 403,
+    "CUSTOMER_UNAUTHORIZED": 401,
+    "UNAUTHENTICATED": 401,
+    "BAD_REQUEST": 400,
+    "RESOURCE_ALREADY_EXISTS": 400,
+    "INVALID_PARAMETER_VALUE": 400,
 }
 
 HTTP_STATUS_TO_ERROR_CODE = {v: k for k, v in ERROR_CODE_TO_HTTP_STATUS.items()}
-HTTP_STATUS_TO_ERROR_CODE[400] = ErrorCode.Name(BAD_REQUEST)
-HTTP_STATUS_TO_ERROR_CODE[404] = ErrorCode.Name(ENDPOINT_NOT_FOUND)
-HTTP_STATUS_TO_ERROR_CODE[500] = ErrorCode.Name(INTERNAL_ERROR)
+HTTP_STATUS_TO_ERROR_CODE[400] = "BAD_REQUEST"
+HTTP_STATUS_TO_ERROR_CODE[404] = "ENDPOINT_NOT_FOUND"
+HTTP_STATUS_TO_ERROR_CODE[500] = "INTERNAL_ERROR"
 
 _logger = logging.getLogger(__name__)
 
@@ -40,7 +41,7 @@ class MlflowException(Exception):
     instead.
     """
 
-    def __init__(self, message, error_code=INTERNAL_ERROR, **kwargs):
+    def __init__(self, message, error_code="INTERNAL_ERROR", **kwargs):
         """
         Args:
             message: The message or exception describing the error that occurred. This will be
@@ -52,9 +53,9 @@ class MlflowException(Exception):
                 of the MlflowException.
         """
         try:
-            self.error_code = ErrorCode.Name(error_code)
+            self.error_code = error_code
         except (ValueError, TypeError):
-            self.error_code = ErrorCode.Name(INTERNAL_ERROR)
+            self.error_code = "INTERNAL_ERROR"
         message = str(message)
         self.message = message
         self.json_kwargs = kwargs
@@ -78,4 +79,4 @@ class MlflowException(Exception):
             kwargs: Additional key-value pairs to include in the serialized JSON representation
                 of the MlflowException.
         """
-        return cls(message, error_code=INVALID_PARAMETER_VALUE, **kwargs)
+        return cls(message, error_code="INVALID_PARAMETER_VALUE", **kwargs)
