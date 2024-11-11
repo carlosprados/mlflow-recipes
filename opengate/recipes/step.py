@@ -62,7 +62,7 @@ class StepExecutionState:
     _KEY_STACK_TRACE = "recipe_step_stack_trace"
 
     def __init__(
-        self, status: StepStatus, last_updated_timestamp: int, stack_trace: str
+        self, status: StepStatus, last_updated_timestamp: int, stack_trace: str | None
     ):
         """
         Args:
@@ -262,7 +262,7 @@ class BaseStep(metaclass=abc.ABCMeta):
         """
         Returns the named artifacts produced by the step for the current class instance.
         """
-        return {}
+        return []
 
     @abc.abstractmethod
     def step_class(self) -> StepClass:
@@ -316,7 +316,9 @@ class BaseStep(metaclass=abc.ABCMeta):
         stack_trace: Optional[str] = None,
     ) -> None:
         execution_state = StepExecutionState(
-            status=status, last_updated_timestamp=time.time(), stack_trace=stack_trace
+            status=status,
+            last_updated_timestamp=int(time.time()),
+            stack_trace=stack_trace,
         )
         with open(
             os.path.join(output_directory, BaseStep._EXECUTION_STATE_FILE_NAME), "w"
