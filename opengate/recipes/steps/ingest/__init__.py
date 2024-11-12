@@ -8,7 +8,6 @@ import pandas as pd
 
 from mlflow.exceptions import MlflowException
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
-from opengate.recipes.artifacts import DataframeArtifact
 from opengate.recipes.cards import BaseCard
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.ingest.datasets import (
@@ -242,6 +241,7 @@ class IngestStep(BaseIngestStep):
         return "ingest"
 
     def get_artifacts(self):
+        from opengate.recipes.artifacts import DataframeArtifact
         return [
             DataframeArtifact(
                 "ingested_data",
@@ -276,6 +276,7 @@ class IngestScoringStep(BaseIngestStep):
         return "ingest_scoring"
 
     def get_artifacts(self):
+        from opengate.recipes.artifacts import DataframeArtifact
         return [
             DataframeArtifact(
                 "ingested_scoring_data",

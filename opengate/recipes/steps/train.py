@@ -15,15 +15,8 @@ from mlflow.entities import SourceType, ViewType
 from mlflow.environment_variables import MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NAME
 from mlflow.exceptions import BAD_REQUEST, INVALID_PARAMETER_VALUE, MlflowException
 from mlflow.models import Model
-from opengate.recipes.artifacts import (
-    DataframeArtifact,
-    HyperParametersArtifact,
-    ModelArtifact,
-    RunArtifact,
-)
 from opengate.recipes.cards import BaseCard
 from opengate.recipes.step import BaseStep, StepClass
-from opengate.recipes.utils.execution import get_step_output_path
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
     _get_custom_metrics,
@@ -308,6 +301,7 @@ class TrainStep(BaseStep):
             import sklearn
             from sklearn.pipeline import make_pipeline
             from sklearn.utils.class_weight import compute_class_weight
+            from opengate.recipes.utils.execution import get_step_output_path
 
             from mlflow.models import infer_signature
 
@@ -1178,6 +1172,12 @@ class TrainStep(BaseStep):
         return environ
 
     def get_artifacts(self):
+        from opengate.recipes.artifacts import (
+            DataframeArtifact,
+            HyperParametersArtifact,
+            ModelArtifact,
+            RunArtifact,
+        )
         return [
             ModelArtifact(
                 "model", self.recipe_root, self.name, self.tracking_config.tracking_uri

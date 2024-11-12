@@ -5,11 +5,9 @@ from typing import Any
 
 import mlflow
 from mlflow.exceptions import BAD_REQUEST, INVALID_PARAMETER_VALUE, MlflowException
-from opengate.recipes.artifacts import DataframeArtifact, RegisteredModelVersionInfo
 from opengate.recipes.cards import BaseCard
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.register import _REGISTERED_MV_INFO_FILE
-from opengate.recipes.utils.execution import get_step_output_path
 from opengate.recipes.utils.step import get_pandas_data_profiles
 from opengate.recipes.utils.tracking import (
     TrackingConfig,
@@ -117,6 +115,8 @@ class PredictStep(BaseStep):
     def _run(self, output_directory):
         import pandas as pd
         from pyspark.sql.functions import struct
+        from opengate.recipes.artifacts import RegisteredModelVersionInfo
+        from opengate.recipes.utils.execution import get_step_output_path
 
         run_start_time = time.time()
 
@@ -291,6 +291,7 @@ class PredictStep(BaseStep):
         return get_databricks_env_vars(tracking_uri=self.tracking_config.tracking_uri)
 
     def get_artifacts(self):
+        from opengate.recipes.artifacts import DataframeArtifact
         return [
             DataframeArtifact(
                 "scored_data", self.recipe_root, self.name, _SCORED_OUTPUT_FILE_NAME

@@ -5,11 +5,9 @@ from typing import Any
 import mlflow
 from mlflow.entities import SourceType
 from mlflow.exceptions import INVALID_PARAMETER_VALUE, MlflowException
-from opengate.recipes.artifacts import ModelVersionArtifact, RegisteredModelVersionInfo
 from opengate.recipes.cards import BaseCard
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.train import TrainStep
-from opengate.recipes.utils.execution import get_step_output_path
 from opengate.recipes.utils.tracking import (
     TrackingConfig,
     apply_recipe_tracking_config,
@@ -52,6 +50,8 @@ class RegisterStep(BaseStep):
         self.registry_uri = self.step_config.get("registry_uri", None)
 
     def _run(self, output_directory):
+        from opengate.recipes.artifacts import RegisteredModelVersionInfo
+        from opengate.recipes.utils.execution import get_step_output_path
         apply_recipe_tracking_config(self.tracking_config)
 
         run_id_path = get_step_output_path(
@@ -196,6 +196,7 @@ class RegisterStep(BaseStep):
         return get_databricks_env_vars(tracking_uri=self.tracking_config.tracking_uri)
 
     def get_artifacts(self):
+        from opengate.recipes.artifacts import ModelVersionArtifact
         return [
             ModelVersionArtifact(
                 "registered_model_version",

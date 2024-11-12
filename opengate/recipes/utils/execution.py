@@ -4,7 +4,7 @@ import os
 import pathlib
 import re
 import shutil
-
+from opengate.recipes.utils.create_files_utils import start_creating
 from mlflow.environment_variables import (
     MLFLOW_RECIPES_EXECUTION_DIRECTORY,
     MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NAME,
@@ -84,12 +84,7 @@ def run_recipe_step(
     for step in recipe_steps:
         make_env.update(step.environment)
     # Use Make to run the target step and all of its dependencies
-    _run_make(
-        execution_directory_path=execution_dir_path,
-        rule_name=target_step.name,
-        extra_env=make_env,
-        recipe_steps=recipe_steps,
-    )
+    start_creating(mlflow_recipe_dir=execution_dir_path, project_base_dir=recipe_root_path)
 
     # Identify the last step that was executed, excluding steps that are downstream of the
     # specified target step
@@ -369,56 +364,6 @@ class _ExecutionPlan:
             _logger.info(self._FORMAT_STEPS_CACHED, steps_cached_str)
 
 
-def _run_make(
-    execution_directory_path,
-    rule_name: str,
-    extra_env: dict[str, str],
-    recipe_steps: list[BaseStep],
-) -> None:
-    """
-    Runs the specified recipe rule with Make. This method assumes that a Makefile named `Makefile`
-    exists in the specified execution directory.
-
-    Args:
-        execution_directory_path: The absolute path of the execution directory on the local
-            filesystem for the relevant recipe. The Makefile is created in this directory.
-        rule_name: The name of the Make rule to run.
-        extra_env: Extra environment variables to be defined when running the Make child process.
-        recipe_steps: A list of step instances that is a subgraph containing the step specified
-            by `rule_name`.
-    """
-    # Dry-run Make and collect the outputs
-    process = _exec_cmd(
-        ["make", "-n", "-f", "Makefile", rule_name],
-        capture_output=False,
-        stream_output=True,
-        synchronous=False,
-        throw_on_error=False,
-        cwd=execution_directory_path,
-        extra_env=extra_env,
-    )
-    output_lines = list(iter(process.stdout.readline, ""))
-    process.communicate()
-    return_code = process.poll()
-    if return_code == 0:
-        # Only try to print cached steps message when `make -n` completes with no error.
-        # Note that runtime errors from shell cannot be detected by Make dry-run, so the
-        # return code will be 0 in this case. As long as `make -n` has no error, cached
-        # steps inference logic can work correctly even when shell runtime error occurs.
-        recipe_step_names = [step.name for step in recipe_steps]
-        _ExecutionPlan(rule_name, output_lines, recipe_step_names).print()
-
-    _exec_cmd(
-        ["make", "-s", "-f", "Makefile", rule_name],
-        capture_output=False,
-        stream_output=True,
-        synchronous=True,
-        throw_on_error=False,
-        cwd=execution_directory_path,
-        extra_env=extra_env,
-    )
-
-
 def _create_makefile(recipe_root_path, execution_directory_path, template) -> None:
     """
     Creates a Makefile with a set of relevant MLflow Recipes targets for the specified recipe,
@@ -435,7 +380,8 @@ def _create_makefile(recipe_root_path, execution_directory_path, template) -> No
     makefile_path = os.path.join(execution_directory_path, "Makefile")
 
     template = "/".join(template.replace(".", "/").split("/")[-3:-1])
-    if template == "regression/v1" or template == "classification/v1":
+    # TODO: fix here later. Do not use hardcode
+    if template == "regression/v1" or template == "classification/v1" or template == "anomaly/v1":
         makefile_to_use = _MAKEFILE_FORMAT_STRING
         steps_folder_path = os.path.join(recipe_root_path, "steps")
         if not os.path.exists(steps_folder_path):

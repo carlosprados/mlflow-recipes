@@ -8,10 +8,8 @@ import cloudpickle
 from packaging.version import Version
 
 from mlflow.exceptions import INVALID_PARAMETER_VALUE, MlflowException
-from opengate.recipes.artifacts import DataframeArtifact, TransformerArtifact
 from opengate.recipes.cards import BaseCard
 from opengate.recipes.step import BaseStep, StepClass
-from opengate.recipes.utils.execution import get_step_output_path
 from opengate.recipes.utils.step import (
     get_pandas_data_profiles,
     validate_classification_config,
@@ -97,6 +95,7 @@ class TransformStep(BaseStep):
 
     def _run(self, output_directory):
         import pandas as pd
+        from opengate.recipes.utils.execution import get_step_output_path
 
         run_start_time = time.time()
 
@@ -265,6 +264,7 @@ class TransformStep(BaseStep):
         return "transform"
 
     def get_artifacts(self):
+        from opengate.recipes.artifacts import DataframeArtifact, TransformerArtifact
         return [
             DataframeArtifact(
                 "transformed_training_data",

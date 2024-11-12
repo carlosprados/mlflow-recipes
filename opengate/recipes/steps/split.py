@@ -12,10 +12,8 @@ import pandas as pd
 from packaging.version import Version
 
 from mlflow.exceptions import BAD_REQUEST, INVALID_PARAMETER_VALUE, MlflowException
-from opengate.recipes.artifacts import DataframeArtifact
 from opengate.recipes.cards import BaseCard
 from opengate.recipes.step import BaseStep, StepClass
-from opengate.recipes.utils.execution import get_step_output_path
 from opengate.recipes.utils.step import (
     get_pandas_data_profiles,
     validate_classification_config,
@@ -411,6 +409,7 @@ class SplitStep(BaseStep):
         return self._validate_and_execute_custom_split(split_fn, input_df)
 
     def _run(self, output_directory):
+        from opengate.recipes.utils.execution import get_step_output_path
         run_start_time = time.time()
 
         # read ingested dataset
@@ -506,6 +505,7 @@ class SplitStep(BaseStep):
         return "split"
 
     def get_artifacts(self):
+        from opengate.recipes.artifacts import DataframeArtifact
         return [
             DataframeArtifact(
                 "training_data", self.recipe_root, self.name, _OUTPUT_TRAIN_FILE_NAME

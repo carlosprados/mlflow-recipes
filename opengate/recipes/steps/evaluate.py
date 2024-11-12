@@ -14,7 +14,6 @@ from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from opengate.recipes.cards import BaseCard
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.train import TrainStep
-from opengate.recipes.utils.execution import get_step_output_path
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
     _get_custom_metrics,
@@ -155,6 +154,7 @@ class EvaluateStep(BaseStep):
         warnings.warn = my_warn
         try:
             import pandas as pd
+            from opengate.recipes.utils.execution import get_step_output_path
 
             with open(os.path.join(output_directory, "warning_logs.txt"), "w"):
                 pass
