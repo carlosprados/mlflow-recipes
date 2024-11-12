@@ -97,15 +97,18 @@ def clean(mlflow_recipe_dir: str):
         os.path.join(mlflow_recipe_dir, "steps/split/outputs/train.parquet"),
         os.path.join(mlflow_recipe_dir, "steps/split/outputs/validation.parquet"),
         os.path.join(mlflow_recipe_dir, "steps/split/outputs/test.parquet"),
-        os.path.join(mlflow_recipe_dir, "transform/outputs"),
-        os.path.join(mlflow_recipe_dir, "train/outputs"),
-        os.path.join(mlflow_recipe_dir, "evaluate/outputs"),
-        os.path.join(mlflow_recipe_dir, "predict/outputs"),
+        os.path.join(mlflow_recipe_dir, "steps/transform/outputs/transformer.pkl"),
+        os.path.join(mlflow_recipe_dir, "steps/transform/outputs/transformed_training_data.parquet"),
+        os.path.join(mlflow_recipe_dir, "steps/transform/outputs/transformed_validation_data.parquet"),
+        os.path.join(mlflow_recipe_dir, "steps/train/outputs/model"),
+        os.path.join(mlflow_recipe_dir, "steps/train/outputs/run_id"),
+        os.path.join(mlflow_recipe_dir, "steps/evaluate/outputs/model_validation_status"),
+        os.path.join(mlflow_recipe_dir, "steps/predict/outputs/scored.parquet")
     ]
     for dir_path in output_dirs:
         if os.path.exists(dir_path):
             print(f"Removing directory: {dir_path}")
-            os.system(f"rm -rf {dir_path}")  # Use os.system here for cleanup simplicity
+            os.system(f"rm -rf {dir_path}")
     print("Clean completed")
 
 def start_creating(mlflow_recipe_dir: str, project_base_dir: str):
@@ -119,5 +122,3 @@ def start_creating(mlflow_recipe_dir: str, project_base_dir: str):
     ingest_scoring(mlflow_recipe_steps_dir, project_base_dir)
     predict(mlflow_recipe_steps_dir, project_base_dir)
     clean(mlflow_recipe_dir)
-
-
