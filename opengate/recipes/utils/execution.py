@@ -189,7 +189,7 @@ def _get_or_create_execution_directory(
         recipe_root_path=recipe_root_path
     )
 
-    _create_makefile(recipe_root_path, execution_dir_path, template)
+    #_create_makefile(recipe_root_path, execution_dir_path, template)
     for step in recipe_steps:
         step_output_subdir_path = _get_step_output_directory_path(
             execution_dir_path, step.name
@@ -377,12 +377,12 @@ def _create_makefile(recipe_root_path, execution_directory_path, template) -> No
             filesystem for the specified recipe. The Makefile is created in this directory.
         template: The template to use to generate the makefile.
     """
-    makefile_path = os.path.join(execution_directory_path, "Makefile")
+    #makefile_path = os.path.join(execution_directory_path, "Makefile")
 
     template = "/".join(template.replace(".", "/").split("/")[-3:-1])
     # TODO: fix here later. Do not use hardcode
     if template == "regression/v1" or template == "classification/v1" or template == "anomaly/v1":
-        makefile_to_use = _MAKEFILE_FORMAT_STRING
+        #makefile_to_use = _MAKEFILE_FORMAT_STRING
         steps_folder_path = os.path.join(recipe_root_path, "steps")
         if not os.path.exists(steps_folder_path):
             os.mkdir(steps_folder_path)
@@ -408,14 +408,14 @@ def _create_makefile(recipe_root_path, execution_directory_path, template) -> No
     else:
         raise ValueError(f"Invalid template: {template}")
 
-    makefile_contents = makefile_to_use.format(
-        path=_MakefilePathFormat(
-            os.path.abspath(recipe_root_path),
-            execution_directory_path=os.path.abspath(execution_directory_path),
-        ),
-    )
-    with open(makefile_path, "w") as f:
-        f.write(makefile_contents)
+    #makefile_contents = makefile_to_use.format(
+    #    path=_MakefilePathFormat(
+    #        os.path.abspath(recipe_root_path),
+    #        execution_directory_path=os.path.abspath(execution_directory_path),
+    #    ),
+    #)
+    #with open(makefile_path, "w") as f:
+    #    f.write(makefile_contents)
 
 
 class _MakefilePathFormat:

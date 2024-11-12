@@ -425,7 +425,7 @@ class Recipe:
         recipe_config = get_recipe_config(
             recipe_root_path=recipe_root_path, profile=profile
         )
-        recipe: str = recipe_config.get("recipe", "")
+        recipe: str = recipe_config.get("recipe")
         if recipe is None:
             raise MlflowException(
                 "The `recipe` property needs to be defined in the `recipe.yaml` file. "
@@ -433,18 +433,20 @@ class Recipe:
                 error_code=INVALID_PARAMETER_VALUE,
             ) from None
 
+        recipe_path = recipe.replace("/", ".").replace("@", ".")
+        class_name = f"opengate.recipes.{recipe_path}.RecipeImpl"
         try:
-            recipe_class_module = _get_class_from_string(recipe)
+            recipe_class_module = _get_class_from_string(class_name)
         except Exception as e:
             if isinstance(e, ModuleNotFoundError):
                 raise MlflowException(
-                    f"Failed to find Recipe {recipe}. "
+                    f"Failed to find Recipe {class_name}. "
                     f"Please check the correctness of the recipe template setting: {recipe}",
                     error_code=INVALID_PARAMETER_VALUE,
                 ) from None
             else:
                 raise MlflowException(
-                    f"Failed to construct Recipe {recipe}",
+                    f"Failed to construct Recipe {class_name}",
                     error_code=INTERNAL_ERROR,
                 ) from e
 
