@@ -69,6 +69,8 @@ def register(mlflow_recipe_dir: str, base_dir: str):
     check_and_create_file(register_conf)
     output_dir = os.path.join(mlflow_recipe_dir, "register/outputs")
     check_and_create_folder(output_dir)
+    run_id_file = os.path.join(output_dir, "run_id")
+    check_and_create_file(run_id_file)
     register_step = RegisterStep.from_step_config_path(step_config_path=register_conf, recipe_root=base_dir)
     register_step.run(output_directory=output_dir)
     print("Register step completed")
@@ -121,14 +123,25 @@ def clean(mlflow_recipe_dir: str):
             os.system(f"rm -rf {dir_path}")
     print("Clean completed")
 
-def start_creating(mlflow_recipe_dir: str, project_base_dir: str):
+def start_creating(mlflow_recipe_dir: str, project_base_dir: str, target: str):
     mlflow_recipe_steps_dir = mlflow_recipe_dir + "/steps"
-    ingest(mlflow_recipe_steps_dir, project_base_dir)
-    split(mlflow_recipe_steps_dir, project_base_dir)
-    transform(mlflow_recipe_steps_dir, project_base_dir)
-    train(mlflow_recipe_steps_dir, project_base_dir)
-    evaluate(mlflow_recipe_steps_dir, project_base_dir)
-    register(mlflow_recipe_steps_dir, project_base_dir)
-    ingest_scoring(mlflow_recipe_steps_dir, project_base_dir)
-    #predict(mlflow_recipe_steps_dir, project_base_dir)
-    clean(mlflow_recipe_dir)
+    match target:
+        case "ingest":
+            ingest(mlflow_recipe_steps_dir, project_base_dir)
+        case "split":
+            split(mlflow_recipe_steps_dir, project_base_dir)
+        case "transform":
+            transform(mlflow_recipe_steps_dir, project_base_dir)
+        case "train":
+            train(mlflow_recipe_steps_dir, project_base_dir)
+        case "evaluate":
+            evaluate(mlflow_recipe_steps_dir, project_base_dir)
+        case "register":
+            register(mlflow_recipe_steps_dir, project_base_dir)
+        case "ingest_scoring":
+            ingest_scoring(mlflow_recipe_steps_dir, project_base_dir)
+        case "predict":
+            predict(mlflow_recipe_steps_dir, project_base_dir)
+        case "clean":
+            clean(mlflow_recipe_steps_dir)
+

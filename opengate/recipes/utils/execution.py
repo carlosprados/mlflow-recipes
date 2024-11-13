@@ -11,7 +11,6 @@ from mlflow.environment_variables import (
 )
 from opengate.recipes.step import BaseStep, StepStatus
 from mlflow.utils.file_utils import read_yaml, write_yaml
-from mlflow.utils.process import _exec_cmd
 
 _logger = logging.getLogger(__name__)
 
@@ -81,10 +80,11 @@ def run_recipe_step(
         # Include target step name in the environment variable set
         MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NAME.name: target_step.name,
     }
-    for step in recipe_steps:
+    for i, step in enumerate(recipe_steps):
         make_env.update(step.environment)
+        start_creating(mlflow_recipe_dir=execution_dir_path, project_base_dir=recipe_root_path,
+                       target=recipe_steps[i].name)
     # Use Make to run the target step and all of its dependencies
-    start_creating(mlflow_recipe_dir=execution_dir_path, project_base_dir=recipe_root_path)
 
     # Identify the last step that was executed, excluding steps that are downstream of the
     # specified target step

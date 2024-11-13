@@ -62,7 +62,8 @@ def _make_elem_hashable(elem):
 def _run_split(task, input_df, split_ratios, target_col):
     if task == "classification":
         return _perform_stratified_split_per_class(input_df, split_ratios, target_col)
-    elif task == "regression":
+    # Anomaly doesn't need to check balance of class
+    elif task == "regression" or task == "anomaly":
         return _perform_split(input_df, split_ratios)
 
 
