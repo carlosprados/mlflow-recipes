@@ -67,6 +67,17 @@ BUILTIN_REGRESSION_RECIPE_METRICS = [
     RecipeMetric(name="mean_absolute_percentage_error", greater_is_better=False),
 ]
 
+BUILTIN_ANOMALY_RECIPE_METRICS = [
+    RecipeMetric(name="mean_squared_error", greater_is_better=False),
+    RecipeMetric(name="root_mean_squared_error", greater_is_better=False),
+    RecipeMetric(name="f1_score", greater_is_better=True),
+    RecipeMetric(name="precision_score", greater_is_better=True),
+    RecipeMetric(name="recall_score", greater_is_better=True),
+    RecipeMetric(name="r2_score", greater_is_better=True),
+    RecipeMetric(name="accuracy_score", greater_is_better=True),
+    RecipeMetric(name="roc_auc", greater_is_better=True),
+]
+
 DEFAULT_METRICS = {
     "regression": "root_mean_squared_error",
     "classification/binary": "f1_score",
@@ -82,7 +93,7 @@ def _get_error_fn(tmpl: str, use_probability: bool = False, positive_class: Opti
     Returns:
         The error function for the provided template.
     """
-    if tmpl == "regression/v1":
+    if tmpl == "regression/v1" or tmpl == "anomaly/v1":
         return lambda predictions, targets: predictions - targets
     if tmpl == "classification/v1":
         if use_probability:
@@ -127,6 +138,8 @@ def _get_extended_task(recipe: str, positive_class: str) -> str:  # noqa: D417
             return "classification/binary"
         else:
             return "classification/multiclass"
+    elif "anomaly" in recipe:
+        return "anomaly"
     raise MlflowException(
         f"No model type for template kind {recipe}",
         error_code=INVALID_PARAMETER_VALUE,
@@ -143,7 +156,7 @@ def _get_model_type_from_template(tmpl: str) -> str:
     """
     if tmpl == "regression/v1":
         return "regressor"
-    if tmpl == "classification/v1":
+    if tmpl == "classification/v1" or tmpl == "anomaly/v1":
         return "classifier"
     raise MlflowException(
         f"No model type for template kind {tmpl}",
@@ -166,6 +179,8 @@ def _get_builtin_metrics(ext_task: str) -> dict[str, str]:  # noqa: D417
         return BUILTIN_BINARY_CLASSIFICATION_RECIPE_METRICS
     elif ext_task == "classification/multiclass":
         return BUILTIN_MULTICLASS_CLASSIFICATION_RECIPE_METRICS
+    elif ext_task == "anomaly":
+        return BUILTIN_ANOMALY_RECIPE_METRICS
     raise MlflowException(
         f"No builtin metrics for template kind {ext_task}",
         error_code=INVALID_PARAMETER_VALUE,

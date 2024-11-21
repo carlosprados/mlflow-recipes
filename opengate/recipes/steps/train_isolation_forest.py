@@ -62,7 +62,7 @@ _USER_DEFINED_TRAIN_STEP_MODULE = "steps.train"
 _logger = logging.getLogger(__name__)
 
 
-class TrainStep(BaseStep):
+class TrainIsolationForest(BaseStep):
     MODEL_ARTIFACT_RELATIVE_PATH = "model"
     SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH = "sk_model"
     PREDICTED_TRAINING_DATA_RELATIVE_PATH = "predicted_training_data.parquet"
@@ -156,7 +156,6 @@ class TrainStep(BaseStep):
             "rebalance_training_data", True
         )
         self.skip_data_profiling = self.step_config.get("skip_data_profiling", False)
-        print(self.step_config)
         if (
             "estimator_method" not in self.step_config
             and self.step_config["using"] == "custom"
@@ -321,6 +320,7 @@ class TrainStep(BaseStep):
                 self.task, self.positive_class, train_df, self.target_col
             )
             self.using_rebalancing = False
+            # TODO: bu if blogu silinebilir
             if self.extended_task == "classification/binary":
                 classes = np.unique(train_df[self.target_col])
                 class_weights = compute_class_weight(
@@ -416,12 +416,12 @@ class TrainStep(BaseStep):
                 model_uri = get_step_output_path(
                     recipe_root_path=self.recipe_root,
                     step_name=self.name,
-                    relative_path=TrainStep.MODEL_ARTIFACT_RELATIVE_PATH,
+                    relative_path=TrainIsolationForest.MODEL_ARTIFACT_RELATIVE_PATH,
                 )
                 sklearn_model_uri = get_step_output_path(
                     recipe_root_path=self.recipe_root,
                     step_name=self.name,
-                    relative_path=TrainStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    relative_path=TrainIsolationForest.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                 )
                 if os.path.exists(model_uri):
                     shutil.rmtree(model_uri)
@@ -463,7 +463,7 @@ class TrainStep(BaseStep):
                 tmp_model_info = Model.load(model_uri)
                 model_data_subpath = os.path.join(
                     "artifacts",
-                    TrainStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    TrainIsolationForest.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                     "model.pkl",
                 )
                 model_info = Model(
@@ -622,7 +622,7 @@ class TrainStep(BaseStep):
                 )
             predicted_training_data.to_parquet(
                 os.path.join(
-                    output_directory, TrainStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH
+                    output_directory, TrainIsolationForest.PREDICTED_TRAINING_DATA_RELATIVE_PATH
                 )
             )
 
@@ -960,7 +960,7 @@ class TrainStep(BaseStep):
                 os.path.join(
                     model_uri,
                     "artifacts",
-                    TrainStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    TrainIsolationForest.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                 )
             )
         )
@@ -1191,7 +1191,7 @@ class TrainStep(BaseStep):
                 "predicted_training_data",
                 self.recipe_root,
                 self.name,
-                TrainStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH,
+                TrainIsolationForest.PREDICTED_TRAINING_DATA_RELATIVE_PATH,
             ),
         ]
 

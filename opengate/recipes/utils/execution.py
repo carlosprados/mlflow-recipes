@@ -83,7 +83,7 @@ def run_recipe_step(
     for i, step in enumerate(recipe_steps):
         make_env.update(step.environment)
         start_creating(mlflow_recipe_dir=execution_dir_path, project_base_dir=recipe_root_path,
-                       target=recipe_steps[i].name)
+                       target=recipe_steps[i].name, template=template)
     # Use Make to run the target step and all of its dependencies
 
     # Identify the last step that was executed, excluding steps that are downstream of the

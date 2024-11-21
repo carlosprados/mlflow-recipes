@@ -60,12 +60,10 @@ def _make_elem_hashable(elem):
 
 
 def _run_split(task, input_df, split_ratios, target_col):
-    if task == "classification":
+    if task == "classification" or (task == "anomaly" and target_col is not None):
         return _perform_stratified_split_per_class(input_df, split_ratios, target_col)
-    # Anomaly doesn't need to check balance of class
-    elif task == "regression" or task == "anomaly":
+    elif task == "regression" or (task == "anomaly" and target_col is None):
         return _perform_split(input_df, split_ratios)
-
 
 def _perform_stratified_split_per_class(input_df, split_ratios, target_col):
     classes = np.unique(input_df[target_col])

@@ -7,6 +7,7 @@ from opengate.recipes.steps.evaluate import EvaluateStep
 from opengate.recipes.steps.register import RegisterStep
 from opengate.recipes.steps.predict import PredictStep
 from opengate.recipes.steps.ingest import IngestScoringStep
+from opengate.recipes.steps.train_isolation_forest import TrainIsolationForest
 
 def check_and_create_file(file_path: str):
     if not os.path.exists(path=file_path):
@@ -46,12 +47,16 @@ def transform(mlflow_recipe_dir: str, base_dir: str):
     transform_step.run(output_directory=output_dir)
     print("Transform step completed")
 
-def train(mlflow_recipe_dir: str, base_dir: str):
+def train(mlflow_recipe_dir: str, base_dir: str, template: str):
     train_conf = os.path.join(mlflow_recipe_dir, "train/conf.yaml")
     check_and_create_file(train_conf)
     output_dir = os.path.join(mlflow_recipe_dir, "train/outputs")
     check_and_create_folder(output_dir)
-    train_step = TrainStep.from_step_config_path(step_config_path=train_conf, recipe_root=base_dir)
+    match template:
+        case "anomaly/v1":
+            train_step = TrainIsolationForest.from_step_config_path(step_config_path=train_conf, recipe_root=base_dir)
+        case _:
+            train_step = TrainStep.from_step_config_path(step_config_path=train_conf, recipe_root=base_dir)
     train_step.run(output_directory=output_dir)
     print("Train step completed")
 
@@ -123,7 +128,7 @@ def clean(mlflow_recipe_dir: str):
             os.system(f"rm -rf {dir_path}")
     print("Clean completed")
 
-def start_creating(mlflow_recipe_dir: str, project_base_dir: str, target: str):
+def start_creating(mlflow_recipe_dir: str, project_base_dir: str, target: str, template: str):
     mlflow_recipe_steps_dir = mlflow_recipe_dir + "/steps"
     match target:
         case "ingest":
@@ -133,7 +138,7 @@ def start_creating(mlflow_recipe_dir: str, project_base_dir: str, target: str):
         case "transform":
             transform(mlflow_recipe_steps_dir, project_base_dir)
         case "train":
-            train(mlflow_recipe_steps_dir, project_base_dir)
+            train(mlflow_recipe_steps_dir, project_base_dir, template)
         case "evaluate":
             evaluate(mlflow_recipe_steps_dir, project_base_dir)
         case "register":
