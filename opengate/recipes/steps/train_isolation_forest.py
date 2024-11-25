@@ -1276,7 +1276,7 @@ class TrainIsolationForest(BaseStep):
                 manual_log_params = {}
                 for param_name, param_value in estimator_args.items():
                     if param_name in autologged_params:
-                        if not TrainStep.is_tuning_param_equal(
+                        if not TrainIsolationForest.is_tuning_param_equal(
                             param_value, autologged_params[param_name]
                         ):
                             _logger.warning(
@@ -1304,7 +1304,7 @@ class TrainIsolationForest(BaseStep):
                 )
                 return sign * transformed_metrics[self.primary_metric]
 
-        search_space = TrainStep.construct_search_space_from_yaml(
+        search_space = TrainIsolationForest.construct_search_space_from_yaml(
             tuning_params["parameters"]
         )
         algo_type, algo_name = tuning_params["algorithm"].rsplit(".", 1)

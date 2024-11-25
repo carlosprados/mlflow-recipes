@@ -128,7 +128,6 @@ from opengate.recipes.steps.ingest import IngestScoringStep, IngestStep
 from opengate.recipes.steps.predict import PredictStep
 from opengate.recipes.steps.register import RegisterStep
 from opengate.recipes.steps.split import SplitStep
-from opengate.recipes.steps.train import TrainStep
 from opengate.recipes.steps.transform import TransformStep
 from opengate.recipes.steps.train_isolation_forest import TrainIsolationForest
 
@@ -174,7 +173,6 @@ class AnomalyRecipe(BaseRecipe):
         # Model training DAG
         SplitStep,
         TransformStep,
-        #TrainStep,
         TrainIsolationForest,
         EvaluateStep,
         RegisterStep,

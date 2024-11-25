@@ -4,19 +4,28 @@ import os
 import pathlib
 import re
 import shutil
-from opengate.recipes.utils.create_files_utils import start_creating
 from mlflow.environment_variables import (
     MLFLOW_RECIPES_EXECUTION_DIRECTORY,
     MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NAME,
 )
 from opengate.recipes.step import BaseStep, StepStatus
 from mlflow.utils.file_utils import read_yaml, write_yaml
+from enum import Enum
+from opengate.recipes.utils.create_files_utils import CreateMlflowFiles
 
 _logger = logging.getLogger(__name__)
 
 _STEPS_SUBDIRECTORY_NAME = "steps"
 _STEP_OUTPUTS_SUBDIRECTORY_NAME = "outputs"
 _STEP_CONF_YAML_NAME = "conf.yaml"
+
+class MLTask(Enum):
+    """
+    Represents the allowed ML tasks
+    """
+    REGRESSION = "regression/v1"
+    CLASSIFICATION = "classification/v1"
+    ANOMALY = "anomaly/v1"
 
 
 def run_recipe_step(
@@ -82,8 +91,11 @@ def run_recipe_step(
     }
     for i, step in enumerate(recipe_steps):
         make_env.update(step.environment)
-        start_creating(mlflow_recipe_dir=execution_dir_path, project_base_dir=recipe_root_path,
-                       target=recipe_steps[i].name, template=template)
+        CreateMlflowFiles(mlflow_recipe_dir=execution_dir_path, project_base_dir=recipe_root_path,
+                          target=recipe_steps[i].name, template=template).start_creating()
+
+        #start_creating(mlflow_recipe_dir=execution_dir_path, project_base_dir=recipe_root_path,
+        #               target=recipe_steps[i].name, template=template)
     # Use Make to run the target step and all of its dependencies
 
     # Identify the last step that was executed, excluding steps that are downstream of the
@@ -377,12 +389,8 @@ def _create_makefile(recipe_root_path, execution_directory_path, template) -> No
             filesystem for the specified recipe. The Makefile is created in this directory.
         template: The template to use to generate the makefile.
     """
-    #makefile_path = os.path.join(execution_directory_path, "Makefile")
-
     template = "/".join(template.replace(".", "/").split("/")[-3:-1])
-    # TODO: fix here later. Do not use hardcode
-    if template == "regression/v1" or template == "classification/v1" or template == "anomaly/v1":
-        #makefile_to_use = _MAKEFILE_FORMAT_STRING
+    if template == MLTask.REGRESSION or template == MLTask.CLASSIFICATION or template == MLTask.ANOMALY:
         steps_folder_path = os.path.join(recipe_root_path, "steps")
         if not os.path.exists(steps_folder_path):
             os.mkdir(steps_folder_path)
@@ -407,15 +415,6 @@ def _create_makefile(recipe_root_path, execution_directory_path, template) -> No
                 )
     else:
         raise ValueError(f"Invalid template: {template}")
-
-    #makefile_contents = makefile_to_use.format(
-    #    path=_MakefilePathFormat(
-    #        os.path.abspath(recipe_root_path),
-    #        execution_directory_path=os.path.abspath(execution_directory_path),
-    #    ),
-    #)
-    #with open(makefile_path, "w") as f:
-    #    f.write(makefile_contents)
 
 
 class _MakefilePathFormat:
