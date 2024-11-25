@@ -129,7 +129,7 @@ from opengate.recipes.steps.predict import PredictStep
 from opengate.recipes.steps.register import RegisterStep
 from opengate.recipes.steps.split import SplitStep
 from opengate.recipes.steps.transform import TransformStep
-from opengate.recipes.steps.train_isolation_forest import TrainIsolationForest
+from opengate.recipes.steps.train_isolation_forest import TrainIsolationForestStep
 
 _logger = logging.getLogger(__name__)
 
@@ -173,7 +173,7 @@ class AnomalyRecipe(BaseRecipe):
         # Model training DAG
         SplitStep,
         TransformStep,
-        TrainIsolationForest,
+        TrainIsolationForestStep,
         EvaluateStep,
         RegisterStep,
         # Batch scoring DAG

@@ -62,7 +62,7 @@ _USER_DEFINED_TRAIN_STEP_MODULE = "steps.train"
 _logger = logging.getLogger(__name__)
 
 
-class TrainIsolationForest(BaseStep):
+class TrainIsolationForestStep(BaseStep):
     MODEL_ARTIFACT_RELATIVE_PATH = "model"
     SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH = "sk_model"
     PREDICTED_TRAINING_DATA_RELATIVE_PATH = "predicted_training_data.parquet"
@@ -416,12 +416,12 @@ class TrainIsolationForest(BaseStep):
                 model_uri = get_step_output_path(
                     recipe_root_path=self.recipe_root,
                     step_name=self.name,
-                    relative_path=TrainIsolationForest.MODEL_ARTIFACT_RELATIVE_PATH,
+                    relative_path=TrainIsolationForestStep.MODEL_ARTIFACT_RELATIVE_PATH,
                 )
                 sklearn_model_uri = get_step_output_path(
                     recipe_root_path=self.recipe_root,
                     step_name=self.name,
-                    relative_path=TrainIsolationForest.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    relative_path=TrainIsolationForestStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                 )
                 if os.path.exists(model_uri):
                     shutil.rmtree(model_uri)
@@ -463,7 +463,7 @@ class TrainIsolationForest(BaseStep):
                 tmp_model_info = Model.load(model_uri)
                 model_data_subpath = os.path.join(
                     "artifacts",
-                    TrainIsolationForest.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    TrainIsolationForestStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                     "model.pkl",
                 )
                 model_info = Model(
@@ -622,7 +622,7 @@ class TrainIsolationForest(BaseStep):
                 )
             predicted_training_data.to_parquet(
                 os.path.join(
-                    output_directory, TrainIsolationForest.PREDICTED_TRAINING_DATA_RELATIVE_PATH
+                    output_directory, TrainIsolationForestStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH
                 )
             )
 
@@ -960,7 +960,7 @@ class TrainIsolationForest(BaseStep):
                 os.path.join(
                     model_uri,
                     "artifacts",
-                    TrainIsolationForest.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    TrainIsolationForestStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                 )
             )
         )
@@ -1191,7 +1191,7 @@ class TrainIsolationForest(BaseStep):
                 "predicted_training_data",
                 self.recipe_root,
                 self.name,
-                TrainIsolationForest.PREDICTED_TRAINING_DATA_RELATIVE_PATH,
+                TrainIsolationForestStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH,
             ),
         ]
 
@@ -1276,7 +1276,7 @@ class TrainIsolationForest(BaseStep):
                 manual_log_params = {}
                 for param_name, param_value in estimator_args.items():
                     if param_name in autologged_params:
-                        if not TrainIsolationForest.is_tuning_param_equal(
+                        if not TrainIsolationForestStep.is_tuning_param_equal(
                             param_value, autologged_params[param_name]
                         ):
                             _logger.warning(
@@ -1304,7 +1304,7 @@ class TrainIsolationForest(BaseStep):
                 )
                 return sign * transformed_metrics[self.primary_metric]
 
-        search_space = TrainIsolationForest.construct_search_space_from_yaml(
+        search_space = TrainIsolationForestStep.construct_search_space_from_yaml(
             tuning_params["parameters"]
         )
         algo_type, algo_name = tuning_params["algorithm"].rsplit(".", 1)
