@@ -8,6 +8,7 @@ import sys
 import warnings
 
 import cloudpickle
+import numpy as np
 import yaml
 
 import mlflow
@@ -16,6 +17,7 @@ from mlflow.environment_variables import MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NA
 from mlflow.exceptions import BAD_REQUEST, INVALID_PARAMETER_VALUE, MlflowException
 from mlflow.models import Model
 from opengate.recipes.cards import BaseCard
+from opengate.recipes.dataset_split import DatasetSplit
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
@@ -26,6 +28,7 @@ from opengate.recipes.utils.metrics import (
     _get_primary_metric,
     _load_custom_metrics,
     transform_multiclass_metrics_dict,
+    BUILTIN_ANOMALY_RECIPE_METRICS
 )
 from opengate.recipes.utils.step import (
     get_merged_eval_metrics,
@@ -40,6 +43,7 @@ from opengate.recipes.utils.tracking import (
     log_code_snapshot,
 )
 from opengate.recipes.utils.wrapped_recipe_model import WrappedRecipeModel
+from opengate.recipes.utils.custom_evaluate import evaluate_anomaly_model
 from mlflow.tracking import MlflowClient
 from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.databricks_utils import (
@@ -266,19 +270,7 @@ class TrainIsolationForestStep(BaseStep):
 
             encoded_y_train = pd.Series(label_encoder.transform(y_train))
 
-        def inverse_label_encoder(predicted_output):
-            if not label_encoder:
-                return predicted_output
-
-            return label_encoder.inverse_transform(predicted_output)
-
         estimator.fit(X_train, encoded_y_train)
-        original_predict = estimator.predict
-
-        def wrapped_predict(*args, **kwargs):
-            return inverse_label_encoder(original_predict(*args, **kwargs))
-
-        estimator.predict = wrapped_predict
 
         return estimator, {"target_column_class_labels": target_column_class_labels}
 
@@ -447,8 +439,10 @@ class TrainIsolationForestStep(BaseStep):
                         artifacts=artifacts,
                     )
                     tempModel = mlflow.pyfunc.load_model(pyfunc_model_tmp_path)
+                    predictions = tempModel.predict(raw_X_train.copy())
+                    processed_predictions = np.where(predictions == -1, 1, 0)
                     model_schema = infer_signature(
-                        raw_X_train, tempModel.predict(raw_X_train.copy())
+                        raw_X_train, processed_predictions
                     )
                     mlflow.pyfunc.save_model(
                         path=model_uri,
@@ -504,21 +498,15 @@ class TrainIsolationForestStep(BaseStep):
                     }
                     if self.positive_class is not None:
                         eval_config["pos_label"] = self.positive_class
-                    eval_result = mlflow.evaluate(
-                        model=logged_estimator.model_uri,
-                        data=dataset,
-                        targets=self.target_col,
-                        model_type=_get_model_type_from_template(self.recipe),
-                        evaluators="default",
-                        extra_metrics=_load_custom_metrics(
-                            self.recipe_root,
-                            self.evaluation_metrics.values(),
-                        ),
-                        evaluator_config=eval_config,
+                    result_save_path = os.path.join(output_directory, f"eval_{dataset_name}")
+                    eval_result = evaluate_anomaly_model(
+                        model_uri=logged_estimator.model_uri,
+                        dataset=dataset,
+                        label_column=self.target_col,
+                        data_prefix=DatasetSplit.TRAINING.value,
+                        artifacts_path=result_save_path
                     )
-                    eval_result.save(
-                        os.path.join(output_directory, f"eval_{dataset_name}")
-                    )
+                    eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {
                         strip_prefix(k, metric_prefix): v
                         for k, v in eval_result.metrics.items()
@@ -528,6 +516,7 @@ class TrainIsolationForestStep(BaseStep):
             prediction_result = model.predict(
                 raw_validation_df.drop(self.target_col, axis=1)
             )
+            prediction_result = np.where(prediction_result == -1, 1, 0)
 
             use_probability_for_error_rate = False
             if isinstance(prediction_result, pd.DataFrame) and {
@@ -566,9 +555,10 @@ class TrainIsolationForestStep(BaseStep):
                 }
             )
             calibrated_plot = None
-            train_predictions = model.predict(
+            original_train_predictions = model.predict(
                 raw_train_df.drop(self.target_col, axis=1)
             )
+            train_predictions = np.where(original_train_predictions == -1, 1, 0)
             if isinstance(train_predictions, pd.DataFrame) and {
                 f"{self.predict_prefix}label",
                 f"{self.predict_prefix}score",
@@ -1391,8 +1381,10 @@ class TrainIsolationForestStep(BaseStep):
                 ),
             }
             mlflow.set_tags(estimator_tags)
+        predictions = estimator.predict(X_train_sampled.copy())
+        processed_predictions = np.where(predictions == -1, 1, 0)
         estimator_schema = infer_signature(
-            X_train_sampled, estimator.predict(X_train_sampled.copy())
+            X_train_sampled, processed_predictions
         )
         return mlflow.sklearn.log_model(
             estimator,

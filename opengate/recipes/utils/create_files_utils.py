@@ -1,4 +1,5 @@
 import os
+
 from opengate.recipes.steps.ingest import IngestStep
 from opengate.recipes.steps.split import SplitStep
 from opengate.recipes.steps.transform import TransformStep
@@ -8,6 +9,8 @@ from opengate.recipes.steps.register import RegisterStep
 from opengate.recipes.steps.predict import PredictStep
 from opengate.recipes.steps.ingest import IngestScoringStep
 from opengate.recipes.steps.train_isolation_forest import TrainIsolationForestStep
+from opengate.recipes.steps.evaluate_isolation_forest import EvaluateIsolationForestStep
+from opengate.recipes.task_enum import MLTask
 
 def check_and_create_file(file_path: str):
     if not os.path.exists(path=file_path):
@@ -62,7 +65,7 @@ class CreateMlflowFiles:
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "train/outputs")
         check_and_create_folder(output_dir)
         match self.template:
-            case "anomaly/v1":
+            case MLTask.ANOMALY.value:
                 train_step = TrainIsolationForestStep.from_step_config_path(step_config_path=train_conf,
                                                                             recipe_root=self.project_base_dir)
             case _:
@@ -75,7 +78,13 @@ class CreateMlflowFiles:
         check_and_create_file(evaluate_conf)
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "evaluate/outputs")
         check_and_create_folder(output_dir)
-        evaluate_step = EvaluateStep.from_step_config_path(step_config_path=evaluate_conf, recipe_root=self.project_base_dir)
+        match self.template:
+            case MLTask.ANOMALY.value:
+                evaluate_step = EvaluateIsolationForestStep.from_step_config_path(step_config_path=evaluate_conf,
+                                                                                  recipe_root=self.project_base_dir)
+            case _:
+                evaluate_step = EvaluateStep.from_step_config_path(step_config_path=evaluate_conf,
+                                                                   recipe_root=self.project_base_dir)
         evaluate_step.run(output_directory=output_dir)
         print("Evaluate step completed")
 

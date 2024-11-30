@@ -10,22 +10,14 @@ from mlflow.environment_variables import (
 )
 from opengate.recipes.step import BaseStep, StepStatus
 from mlflow.utils.file_utils import read_yaml, write_yaml
-from enum import Enum
 from opengate.recipes.utils.create_files_utils import CreateMlflowFiles
+from opengate.recipes.task_enum import MLTask
 
 _logger = logging.getLogger(__name__)
 
 _STEPS_SUBDIRECTORY_NAME = "steps"
 _STEP_OUTPUTS_SUBDIRECTORY_NAME = "outputs"
 _STEP_CONF_YAML_NAME = "conf.yaml"
-
-class MLTask(Enum):
-    """
-    Represents the allowed ML tasks
-    """
-    REGRESSION = "regression/v1"
-    CLASSIFICATION = "classification/v1"
-    ANOMALY = "anomaly/v1"
 
 
 def run_recipe_step(

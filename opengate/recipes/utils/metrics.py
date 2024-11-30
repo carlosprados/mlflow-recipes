@@ -7,6 +7,8 @@ from mlflow.exceptions import BAD_REQUEST, MlflowException
 from mlflow.models import EvaluationMetric, make_metric
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 
+from opengate.recipes.task_enum import MLTask
+
 _logger = logging.getLogger(__name__)
 
 
@@ -75,7 +77,7 @@ BUILTIN_ANOMALY_RECIPE_METRICS = [
     RecipeMetric(name="recall_score", greater_is_better=True),
     RecipeMetric(name="r2_score", greater_is_better=True),
     RecipeMetric(name="accuracy_score", greater_is_better=True),
-    RecipeMetric(name="roc_auc", greater_is_better=True),
+    RecipeMetric(name="roc_auc_score", greater_is_better=True),
 ]
 
 DEFAULT_METRICS = {
@@ -154,9 +156,9 @@ def _get_model_type_from_template(tmpl: str) -> str:
     Returns:
         A model type literal compatible with the mlflow evaluation service, e.g. regressor.
     """
-    if tmpl == "regression/v1":
+    if tmpl == MLTask.REGRESSION.value:
         return "regressor"
-    if tmpl == "classification/v1" or tmpl == "anomaly/v1":
+    if tmpl == MLTask.CLASSIFICATION.value or tmpl == MLTask.ANOMALY.value:
         return "classifier"
     raise MlflowException(
         f"No model type for template kind {tmpl}",
