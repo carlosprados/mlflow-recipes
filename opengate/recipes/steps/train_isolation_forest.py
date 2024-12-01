@@ -17,7 +17,7 @@ from mlflow.environment_variables import MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NA
 from mlflow.exceptions import BAD_REQUEST, INVALID_PARAMETER_VALUE, MlflowException
 from mlflow.models import Model
 from opengate.recipes.cards import BaseCard
-from opengate.recipes.dataset_split import DatasetSplit
+from opengate.recipes.dataset_split_enum import DatasetSplit
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
@@ -503,7 +503,7 @@ class TrainIsolationForestStep(BaseStep):
                         model_uri=logged_estimator.model_uri,
                         dataset=dataset,
                         label_column=self.target_col,
-                        data_prefix=DatasetSplit.TRAINING.value,
+                        dataset_name=dataset_name,
                         artifacts_path=result_save_path
                     )
                     eval_result.save(result_save_path)

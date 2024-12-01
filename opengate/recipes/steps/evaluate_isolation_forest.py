@@ -12,7 +12,7 @@ import mlflow
 from mlflow.exceptions import MlflowException
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from opengate.recipes.cards import BaseCard
-from opengate.recipes.dataset_split import DatasetSplit
+from opengate.recipes.dataset_split_enum import DatasetSplit
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.train import TrainStep
 from opengate.recipes.utils.custom_evaluate import evaluate_anomaly_model
@@ -232,7 +232,7 @@ class EvaluateIsolationForestStep(BaseStep):
                         model_uri=model_uri,
                         dataset=dataset,
                         label_column=self.target_col,
-                        data_prefix=evaluator_config["metric_prefix"],
+                        dataset_name=dataset_name,
                         artifacts_path=result_save_path
                     )
                     eval_result.save(result_save_path)
