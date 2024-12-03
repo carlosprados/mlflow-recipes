@@ -70,13 +70,9 @@ BUILTIN_REGRESSION_RECIPE_METRICS = [
 ]
 
 BUILTIN_ANOMALY_RECIPE_METRICS = [
-    RecipeMetric(name="mean_squared_error", greater_is_better=False),
-    RecipeMetric(name="root_mean_squared_error", greater_is_better=False),
     RecipeMetric(name="f1_score", greater_is_better=True),
     RecipeMetric(name="precision_score", greater_is_better=True),
     RecipeMetric(name="recall_score", greater_is_better=True),
-    RecipeMetric(name="r2_score", greater_is_better=True),
-    RecipeMetric(name="accuracy_score", greater_is_better=True),
     RecipeMetric(name="roc_auc_score", greater_is_better=True),
 ]
 

@@ -232,8 +232,13 @@ class EvaluateIsolationForestStep(BaseStep):
                         model_uri=model_uri,
                         dataset=dataset,
                         label_column=self.target_col,
-                        dataset_name=dataset_name,
-                        artifacts_path=result_save_path
+                        dataset_name=dataset_name.upper(),
+                        artifacts_path=result_save_path,
+                        root_recipe=self.recipe_root,
+                        extra_metrics=_load_custom_metrics(
+                            self.recipe_root,
+                            self.evaluation_metrics.values(),
+                        )
                     )
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {
