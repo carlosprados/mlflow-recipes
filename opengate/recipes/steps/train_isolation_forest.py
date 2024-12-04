@@ -72,6 +72,8 @@ class TrainIsolationForestStep(BaseStep):
     PREDICTED_TRAINING_DATA_RELATIVE_PATH = "predicted_training_data.parquet"
 
     def __init__(self, step_config, recipe_root, recipe_config=None):
+        if recipe_config is not None:
+            step_config.update({"threshold": recipe_config["threshold"]})
         super().__init__(step_config, recipe_root)
         self.tracking_config = TrackingConfig.from_dict(self.step_config)
         self.recipe_config = recipe_config
@@ -509,7 +511,8 @@ class TrainIsolationForestStep(BaseStep):
                         extra_metrics=_load_custom_metrics(
                             self.recipe_root,
                             self.evaluation_metrics.values(),
-                        )
+                        ),
+                        threshold=self.step_config["threshold"]
                     )
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {

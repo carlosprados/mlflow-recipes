@@ -27,7 +27,8 @@ def evaluate_anomaly_model(
         dataset_name: str,
         artifacts_path: str,
         root_recipe: str,
-        extra_metrics: List[EvaluationMetric]
+        extra_metrics: List[EvaluationMetric],
+        threshold: float = None
 ) -> EvaluationResult:
     # Load Isolation Forest model
     model = load_model(model_uri)
@@ -51,6 +52,7 @@ def evaluate_anomaly_model(
                 normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
                 optimal_threshold = save_roc_curve(labels=labels, prediction_scores=normalized_scores,
                                                    roc_path=artifacts_path, dataset_name=dataset_name)
+                optimal_threshold = threshold if threshold is not None else optimal_threshold
                 save_cm(labels=labels, scores=normalized_scores, threshold=optimal_threshold,
                         artifact_path=artifacts_path, dataset_name=dataset_name)
         except AttributeError as ae:
@@ -67,25 +69,19 @@ def evaluate_anomaly_model(
 def save_roc_curve(labels, prediction_scores, roc_path: str, dataset_name: str):
     os.makedirs(roc_path, exist_ok=True)
     try:
-        fpr, tpr, thresholds = roc_curve(labels.values, prediction_scores)
-        #normalized_fpr = (fpr - fpr.min()) / (fpr.max() - fpr.min())
-        #normalized_tpr = (tpr - tpr.min()) / (tpr.max() - tpr.min())
-        #roc_auc = auc(normalized_fpr, normalized_tpr)
-        # Calculate Youden's J statistic
-        youden_j = tpr - fpr
-        optimal_idx = np.argmax(youden_j)
+        fpr, tpr, thresholds = roc_curve(labels, prediction_scores)
+        roc_auc = auc(fpr, tpr)
+        optimal_idx = np.argmin(np.sqrt((1 - tpr) ** 2 + fpr ** 2))
         optimal_threshold = thresholds[optimal_idx]
+        log_metric(f"Optimal_threshold_for_{dataset_name}", optimal_threshold)
 
         # Plot ROC curve
         plt.figure(figsize=(14, 6))
-        plt.plot(fpr, tpr, label=f"ROC curve (AUC = {auc(fpr, tpr):.2f})", color='blue')
-        plt.plot([0, 1], [0, 1], '--', color='gray', label="Random chance")
-        # Mark the optimal threshold
-        plt.scatter(fpr[optimal_idx], tpr[optimal_idx], color='red', label=f"Optimal Threshold = {optimal_threshold:.2f}")
-
-        plt.xlabel("False Positive Rate")
-        plt.ylabel("True Positive Rate")
-        plt.title(f"{dataset_name} ROC Curve")
+        plt.plot(fpr, tpr, color='darkorange', lw=2, label=f'ROC curve (area = {roc_auc:.2f})')
+        plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--', label='Random chance')
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title('Receiver Operating Characteristic (ROC) Curve')
         plt.legend(loc="lower right")
         plt.grid()
         roc_full_path = os.path.join(roc_path, dataset_name + "_roc.png")
@@ -102,7 +98,7 @@ def save_cm(labels, scores, threshold, artifact_path: str, dataset_name: str):
         cm = confusion_matrix(labels, predicted_labels, labels=[0, 1])
         disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Benign", "Malign"])
         disp.plot(cmap=plt.cm.Blues, values_format='d')
-        plt.title(f"{dataset_name[:-1]} Confusion Matrix")
+        plt.title(f"{dataset_name} Confusion Matrix")
         cf_path = os.path.join(artifact_path, dataset_name + "_cf.png")
         is_sub_train_folder = True if artifact_path.split("/")[-3] == "train" else False # for identify training step
         if dataset_name == "training" or is_sub_train_folder:

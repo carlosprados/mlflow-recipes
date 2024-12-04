@@ -20,7 +20,6 @@ from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
     _get_custom_metrics,
     _get_extended_task,
-    _get_model_type_from_template,
     _get_primary_metric,
     _load_custom_metrics,
     transform_multiclass_metric,
@@ -238,7 +237,8 @@ class EvaluateIsolationForestStep(BaseStep):
                         extra_metrics=_load_custom_metrics(
                             self.recipe_root,
                             self.evaluation_metrics.values(),
-                        )
+                        ),
+                        threshold=self.step_config["threshold"]
                     )
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {

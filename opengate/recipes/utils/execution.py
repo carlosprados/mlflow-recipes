@@ -231,6 +231,8 @@ def _write_updated_step_confs(
             prev_step_conf = None
 
         if prev_step_conf != step.step_config:
+            if step.name == "evaluate":
+                step.step_config.update({"threshold": extract_threshold_from_train_conf(step_subdir_path)})
             write_yaml(
                 root=step_subdir_path,
                 file_name=_STEP_CONF_YAML_NAME,
@@ -239,6 +241,12 @@ def _write_updated_step_confs(
                 sort_keys=True,
             )
 
+def extract_threshold_from_train_conf(eval_step_conf_path: str):
+    step_subdir_path = os.path.join("/".join(eval_step_conf_path.split("/")[:-1]), "train")
+    train_step_conf = read_yaml(
+        root=step_subdir_path, file_name=_STEP_CONF_YAML_NAME
+    )
+    return train_step_conf["threshold"]
 
 def get_or_create_base_execution_directory(recipe_root_path: str) -> str:
     """
