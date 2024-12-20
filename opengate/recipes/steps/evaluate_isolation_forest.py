@@ -15,7 +15,7 @@ from opengate.recipes.cards import BaseCard
 from opengate.recipes.dataset_split_enum import DatasetSplit
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.train import TrainStep
-from opengate.recipes.utils.custom_evaluate import evaluate_anomaly_model
+from opengate.recipes.utils.custom_evaluate import EvaluateAnomalyModel
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
     _get_custom_metrics,
@@ -227,7 +227,7 @@ class EvaluateIsolationForestStep(BaseStep):
                     if self.extended_task == "classification/binary":
                         evaluator_config["pos_label"] = self.positive_class
                     result_save_path = os.path.join(output_directory, f"eval_{dataset_name}")
-                    eval_result = evaluate_anomaly_model(
+                    evaluator = EvaluateAnomalyModel(
                         model_uri=model_uri,
                         dataset=dataset,
                         label_column=self.target_col,
@@ -238,8 +238,10 @@ class EvaluateIsolationForestStep(BaseStep):
                             self.recipe_root,
                             self.evaluation_metrics.values(),
                         ),
-                        threshold=self.step_config["threshold"]
+                        threshold=self.step_config["threshold"],
+                        model_type=self.step_config["model_type"]
                     )
+                    eval_result = evaluator.evaluate_anomaly_model()
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {
                         transform_multiclass_metric(

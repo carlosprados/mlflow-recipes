@@ -9,15 +9,17 @@ import warnings
 
 import cloudpickle
 import numpy as np
+import pandas as pd
 import yaml
 
 import mlflow
+import keras
 from mlflow.entities import SourceType, ViewType
 from mlflow.environment_variables import MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NAME
 from mlflow.exceptions import BAD_REQUEST, INVALID_PARAMETER_VALUE, MlflowException
 from mlflow.models import Model
 from opengate.recipes.cards import BaseCard
-from opengate.recipes.dataset_split_enum import DatasetSplit
+from opengate.recipes.custom_models import CustomModels
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
@@ -43,7 +45,7 @@ from opengate.recipes.utils.tracking import (
     log_code_snapshot,
 )
 from opengate.recipes.utils.wrapped_recipe_model import WrappedRecipeModel
-from opengate.recipes.utils.custom_evaluate import evaluate_anomaly_model
+from opengate.recipes.utils.custom_evaluate import EvaluateAnomalyModel
 from mlflow.tracking import MlflowClient
 from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.databricks_utils import (
@@ -72,7 +74,7 @@ class TrainIsolationForestStep(BaseStep):
     PREDICTED_TRAINING_DATA_RELATIVE_PATH = "predicted_training_data.parquet"
 
     def __init__(self, step_config, recipe_root, recipe_config=None):
-        if recipe_config is not None:
+        if recipe_config is not None and "threshold" in recipe_config:
             step_config.update({"threshold": recipe_config["threshold"]})
         super().__init__(step_config, recipe_root)
         self.tracking_config = TrackingConfig.from_dict(self.step_config)
@@ -272,7 +274,22 @@ class TrainIsolationForestStep(BaseStep):
 
             encoded_y_train = pd.Series(label_encoder.transform(y_train))
 
-        estimator.fit(X_train, encoded_y_train)
+        if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
+            estimator = self._set_autoencoder(dataset=X_train)
+            early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True,
+                                        min_delta=self.step_config["estimator_params"]["early_stopping_loss_delta"])
+            estimator.fit(
+                X_train, X_train,
+                epochs=self.step_config["estimator_params"]["epochs"],
+                batch_size=self.step_config["estimator_params"]["batch_size"],
+                validation_split=self.step_config["estimator_params"]["validation_split"],
+                shuffle=self.step_config["estimator_params"]["shuffle"],
+                #use_multiprocessing=self.step_config["estimator_params"]["use_multiprocessing"],
+                callbacks=[early_stopping] if early_stopping else None,
+                verbose=1
+            )
+        else:
+            estimator.fit(X_train, encoded_y_train)
 
         return estimator, {"target_column_class_labels": target_column_class_labels}
 
@@ -380,7 +397,7 @@ class TrainIsolationForestStep(BaseStep):
                 estimator = self._resolve_estimator(
                     X_train, y_train, validation_df, run, output_directory
                 )
-                best_estimator_params = estimator.get_params()
+                best_estimator_params = estimator.get_config() if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name else estimator.get_params()
                 fitted_estimator, additional_fitted_args = self._fitted_estimator(
                     estimator, X_train, y_train
                 )
@@ -442,7 +459,10 @@ class TrainIsolationForestStep(BaseStep):
                     )
                     tempModel = mlflow.pyfunc.load_model(pyfunc_model_tmp_path)
                     predictions = tempModel.predict(raw_X_train.copy())
-                    processed_predictions = np.where(predictions == -1, 1, 0)
+                    if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
+                        processed_predictions = (predictions >= self.step_config["threshold"]).astype(int)[:, 0]
+                    else:
+                        processed_predictions = np.where(predictions == -1, 1, 0)
                     model_schema = infer_signature(
                         raw_X_train, processed_predictions
                     )
@@ -501,7 +521,7 @@ class TrainIsolationForestStep(BaseStep):
                     if self.positive_class is not None:
                         eval_config["pos_label"] = self.positive_class
                     result_save_path = os.path.join(output_directory, f"eval_{dataset_name}")
-                    eval_result = evaluate_anomaly_model(
+                    evaluator = EvaluateAnomalyModel(
                         model_uri=logged_estimator.model_uri,
                         dataset=dataset,
                         label_column=self.target_col,
@@ -512,8 +532,10 @@ class TrainIsolationForestStep(BaseStep):
                             self.recipe_root,
                             self.evaluation_metrics.values(),
                         ),
-                        threshold=self.step_config["threshold"]
+                        threshold=self.step_config["threshold"],
+                        model_type=self.step_config["model_type"]
                     )
+                    eval_result = evaluator.evaluate_anomaly_model()
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {
                         strip_prefix(k, metric_prefix): v
@@ -524,7 +546,10 @@ class TrainIsolationForestStep(BaseStep):
             prediction_result = model.predict(
                 raw_validation_df.drop(self.target_col, axis=1)
             )
-            prediction_result = np.where(prediction_result == -1, 1, 0)
+            if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
+                prediction_result = (prediction_result >= self.step_config["threshold"]).astype(int)[:, 0]
+            else:
+                prediction_result = np.where(prediction_result == -1, 1, 0)
 
             use_probability_for_error_rate = False
             if isinstance(prediction_result, pd.DataFrame) and {
@@ -566,7 +591,10 @@ class TrainIsolationForestStep(BaseStep):
             original_train_predictions = model.predict(
                 raw_train_df.drop(self.target_col, axis=1)
             )
-            train_predictions = np.where(original_train_predictions == -1, 1, 0)
+            if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
+                train_predictions = (original_train_predictions >= self.step_config["threshold"]).astype(int)[:, 0]
+            else:
+                train_predictions = np.where(original_train_predictions == -1, 1, 0)
             if isinstance(train_predictions, pd.DataFrame) and {
                 f"{self.predict_prefix}label",
                 f"{self.predict_prefix}score",
@@ -703,7 +731,7 @@ class TrainIsolationForestStep(BaseStep):
             )
         elif len(estimator_hardcoded_params) > 0:
             estimator = estimator_fn(estimator_hardcoded_params)
-            all_estimator_params = estimator.get_params()
+            all_estimator_params = estimator.get_config() if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name else estimator.get_params()
             default_params_keys = (
                 all_estimator_params.keys() - estimator_hardcoded_params.keys()
             )
@@ -1390,7 +1418,10 @@ class TrainIsolationForestStep(BaseStep):
             }
             mlflow.set_tags(estimator_tags)
         predictions = estimator.predict(X_train_sampled.copy())
-        processed_predictions = np.where(predictions == -1, 1, 0)
+        if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
+            processed_predictions = (predictions >= self.step_config["threshold"]).astype(int)[:, 0]
+        else:
+            processed_predictions = np.where(predictions == -1, 1, 0)
         estimator_schema = infer_signature(
             X_train_sampled, processed_predictions
         )
@@ -1493,3 +1524,51 @@ class TrainIsolationForestStep(BaseStep):
         return pd.concat([df_minority_class, df_majority_downsampled], axis=0).sample(
             frac=1
         )
+    def _set_autoencoder(self, dataset: pd.DataFrame) -> keras.Model:
+        autoencoder_params = self.step_config["estimator_params"]
+        # Define learning rate schedule based on exponential decay
+        lr_schedule = keras.optimizers.schedules.ExponentialDecay(
+            initial_learning_rate=autoencoder_params["learning_rate"],
+            decay_steps=autoencoder_params['decay_steps'],
+            decay_rate=autoencoder_params['decay_rate']
+        )
+
+        # Define the Autoencoder architecture
+        input_dim = dataset.shape[1]
+        hidden_layers_neurons = autoencoder_params['hidden_layers_neurons']
+
+        input_layer = keras.layers.Input(shape=(input_dim,))
+
+        # Define the encoder layers
+        x = keras.layers.Dense(
+            hidden_layers_neurons[0],
+            activation=autoencoder_params['first_layer_activation'],
+            kernel_initializer=keras.initializers.glorot_uniform(seed=autoencoder_params["first_layer_initializer_seed"]), # TODO: check it later
+            activity_regularizer=keras.regularizers.L1(autoencoder_params['regularizer_value'])
+        )(input_layer)
+
+        # Hidden layers with ReLU activation
+        for neurons in hidden_layers_neurons[1:-1]:
+            x = keras.layers.Dense(
+                neurons,
+                activation=autoencoder_params["hidden_activation"],
+                kernel_initializer=keras.initializers.he_uniform(seed=autoencoder_params["hidden_initializer_seed"])
+            )(x)
+
+        # Define the decoder layers
+        x = keras.layers.Dense(
+            hidden_layers_neurons[-1],
+            activation=autoencoder_params["output_activation"],
+            kernel_initializer=keras.initializers.glorot_uniform(seed=autoencoder_params["output_initializer_seed"])
+        )(x)
+
+        decoded = keras.layers.Dense(input_dim, activation=autoencoder_params["output_activation"])(x)
+
+        # Build and compile the Autoencoder model
+        autoencoder = keras.Model(inputs=input_layer, outputs=decoded)
+        autoencoder.compile(
+            optimizer=keras.optimizers.Adam(learning_rate=lr_schedule),
+            loss=autoencoder_params["loss"]
+        )
+
+        return autoencoder

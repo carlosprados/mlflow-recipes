@@ -13,6 +13,8 @@ from mlflow.utils.file_utils import read_yaml, write_yaml
 from opengate.recipes.utils.create_files_utils import CreateMlflowFiles
 from opengate.recipes.task_enum import MLTask
 
+from typing import Dict
+
 _logger = logging.getLogger(__name__)
 
 _STEPS_SUBDIRECTORY_NAME = "steps"
@@ -233,6 +235,7 @@ def _write_updated_step_confs(
         if prev_step_conf != step.step_config:
             if step.name == "evaluate":
                 step.step_config.update({"threshold": extract_threshold_from_train_conf(step_subdir_path)})
+                step.step_config.update({"model_type": extract_model_type_from_train_conf(step_subdir_path)})
             write_yaml(
                 root=step_subdir_path,
                 file_name=_STEP_CONF_YAML_NAME,
@@ -241,12 +244,31 @@ def _write_updated_step_confs(
                 sort_keys=True,
             )
 
-def extract_threshold_from_train_conf(eval_step_conf_path: str):
+def extract_config(eval_step_conf_path: str) -> Dict[str, any]:
     step_subdir_path = os.path.join("/".join(eval_step_conf_path.split("/")[:-1]), "train")
     train_step_conf = read_yaml(
         root=step_subdir_path, file_name=_STEP_CONF_YAML_NAME
     )
-    return train_step_conf["threshold"]
+    return train_step_conf
+
+def extract_threshold_from_train_conf(eval_step_conf_path: str) -> float:
+    train_step_conf = extract_config(eval_step_conf_path)
+    threshold = train_step_conf.get("threshold")
+    model_type = train_step_conf.get("model_type")
+    if model_type == "autoencoder" and threshold is None:
+        raise ValueError("Autoencoder model must have threshold value in `recipe.yaml`")
+    if threshold is not None and not (0 <= threshold <= 1):
+        raise ValueError("Threshold must be between 0 and 1.")
+
+    return threshold
+
+def extract_model_type_from_train_conf(eval_step_conf_path: str) -> str:
+    train_step_conf = extract_config(eval_step_conf_path)
+    model_type: str = train_step_conf.get("model_type")
+    if model_type is None:
+        raise ValueError("Model type is obligated in recipe.yaml")
+    return model_type.lower()
+
 
 def get_or_create_base_execution_directory(recipe_root_path: str) -> str:
     """
