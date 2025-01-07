@@ -1,8 +1,12 @@
 import os.path
 import sys
 
+import pandas as pd
 from mlflow.exceptions import BAD_REQUEST, MlflowException
-from opengate.recipes.custom_models import CustomModels
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import RobustScaler, MinMaxScaler
+
+from opengate.recipes.custom_models_enum import CustomModels
 from opengate.recipes.utils.metrics import BUILTIN_ANOMALY_RECIPE_METRICS
 
 from pandas import DataFrame
@@ -36,15 +40,21 @@ class EvaluateAnomalyModel:
         self.model_type = model_type
         self.labels = dataset[label_column]
 
+    #def _prepare_data_for_model(self, dataset):
+    #    """Prepare data based on model type."""
+    #    data = dataset.drop(columns=[self.label_column])
+    #    if self.model_type == CustomModels.AUTOENCODER.model_name:
+    #        data = preprocess_anomaly_data(data)
+    #    return data
+
     def evaluate_anomaly_model(self):
         # Load model
         model = load_model(self.model_uri)
-        data = self.dataset.drop(columns=[self.label_column])
-        raw_predictions = model.predict(data)
-        if self.model_type == CustomModels.AUTOENCODER.model_name:
-            predictions = (raw_predictions >= self.threshold).astype(int)[:, 0]
-        else:
-            predictions = np.where(raw_predictions == -1, 1, 0)
+        raw_data = self.dataset.drop(columns=[self.label_column])
+        #processed_data = preprocess_anomaly_data(raw_data)
+        raw_predictions = model.predict(raw_data)
+        predictions = process_predictions(threshold=self.threshold, model_input=raw_data, raw_predictions=raw_predictions,
+                                          model_type=self.model_type)
         artifacts = {}
         calculated_metrics = {}
 
@@ -59,10 +69,11 @@ class EvaluateAnomalyModel:
                     match self.model_type:
                         case CustomModels.AUTOENCODER.model_name:
                             # Calculation average value of first dimension as a score
-                            normalized_scores = np.mean(raw_predictions, axis=1)
+                            #normalized_scores = np.mean(raw_predictions, axis=1)
+                            normalized_scores = raw_predictions.max(axis=1)
                         case CustomModels.ISOLATION_FOREST.model_name:
                             # Negating as higher scores indicate normal in IF
-                            scores = -model.decision_function(data)
+                            scores = -model.decision_function(raw_data)
                             normalized_scores = (scores - scores.min()) / (scores.max() - scores.min())
                         case _:
                             raise MlflowException(
@@ -138,3 +149,23 @@ class EvaluateAnomalyModel:
             extra_calculated_metrics[metric.name] = extra_metric_score
 
         return extra_calculated_metrics
+
+
+def preprocess_anomaly_data(X_train: pd.DataFrame) -> pd.DataFrame:
+    preprocess_pipeline = Pipeline(
+        [
+            ("transformer", RobustScaler()),
+            ("norm", MinMaxScaler(feature_range=(0, 1))),
+        ]
+    )
+    transformed_data = preprocess_pipeline.fit_transform(X_train)
+    return pd.DataFrame(transformed_data, columns=X_train.columns, index=X_train.index)
+
+def process_predictions(threshold: float, model_input: pd.DataFrame, raw_predictions: pd.DataFrame,
+                        model_type: str) -> np.ndarray:
+    """Process raw predictions based on model type."""
+    if model_type == CustomModels.AUTOENCODER.model_name:
+        mse = np.mean(np.power(model_input - raw_predictions, 2), axis=1)
+        processed_threshold = np.quantile(mse, threshold)
+        return (mse >= processed_threshold).astype(int)
+    return np.where(raw_predictions == -1, 1, 0)

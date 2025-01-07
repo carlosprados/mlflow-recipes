@@ -8,6 +8,8 @@ from mlflow.environment_variables import (
     MLFLOW_RECIPES_EXECUTION_DIRECTORY,
     MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NAME,
 )
+
+from opengate.recipes.custom_models_enum import CustomModels
 from opengate.recipes.step import BaseStep, StepStatus
 from mlflow.utils.file_utils import read_yaml, write_yaml
 from opengate.recipes.utils.create_files_utils import CreateMlflowFiles
@@ -255,7 +257,8 @@ def extract_threshold_from_train_conf(eval_step_conf_path: str) -> float:
     train_step_conf = extract_config(eval_step_conf_path)
     threshold = train_step_conf.get("threshold")
     model_type = train_step_conf.get("model_type")
-    if model_type == "autoencoder" and threshold is None:
+    model_type = model_type.lower() if model_type is not None else None
+    if model_type == CustomModels.AUTOENCODER.model_name and threshold is None:
         raise ValueError("Autoencoder model must have threshold value in `recipe.yaml`")
     if threshold is not None and not (0 <= threshold <= 1):
         raise ValueError("Threshold must be between 0 and 1.")

@@ -15,7 +15,7 @@ from opengate.recipes.cards import BaseCard
 from opengate.recipes.dataset_split_enum import DatasetSplit
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.train import TrainStep
-from opengate.recipes.utils.custom_evaluate import EvaluateAnomalyModel
+from opengate.recipes.utils.anomaly_evaluate_util import EvaluateAnomalyModel
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
     _get_custom_metrics,

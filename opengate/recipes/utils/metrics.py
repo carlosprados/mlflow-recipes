@@ -7,6 +7,8 @@ from mlflow.exceptions import BAD_REQUEST, MlflowException
 from mlflow.models import EvaluationMetric, make_metric
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 
+import numpy as np
+
 from opengate.recipes.task_enum import MLTask
 
 _logger = logging.getLogger(__name__)
@@ -91,8 +93,10 @@ def _get_error_fn(tmpl: str, use_probability: bool = False, positive_class: Opti
     Returns:
         The error function for the provided template.
     """
-    if tmpl == "regression/v1" or tmpl == "anomaly/v1":
+    if tmpl == "regression/v1":
         return lambda predictions, targets: predictions - targets
+    if tmpl == "anomaly/v1":
+        return lambda predictions, target: np.power(target - predictions, 2)
     if tmpl == "classification/v1":
         if use_probability:
             # It computes error rate for binary classification since

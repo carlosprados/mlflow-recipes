@@ -6,6 +6,7 @@ import re
 import shutil
 import sys
 import warnings
+from typing import Tuple
 
 import cloudpickle
 import numpy as np
@@ -14,12 +15,21 @@ import yaml
 
 import mlflow
 import keras
+from tensorflow.keras import initializers, regularizers
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import MinMaxScaler, RobustScaler
+
 from mlflow.entities import SourceType, ViewType
 from mlflow.environment_variables import MLFLOW_RECIPES_EXECUTION_TARGET_STEP_NAME
 from mlflow.exceptions import BAD_REQUEST, INVALID_PARAMETER_VALUE, MlflowException
 from mlflow.models import Model
 from opengate.recipes.cards import BaseCard
-from opengate.recipes.custom_models import CustomModels
+from opengate.recipes.custom_models_enum import CustomModels
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
@@ -29,8 +39,7 @@ from opengate.recipes.utils.metrics import (
     _get_model_type_from_template,
     _get_primary_metric,
     _load_custom_metrics,
-    transform_multiclass_metrics_dict,
-    BUILTIN_ANOMALY_RECIPE_METRICS
+    transform_multiclass_metrics_dict
 )
 from opengate.recipes.utils.step import (
     get_merged_eval_metrics,
@@ -45,7 +54,8 @@ from opengate.recipes.utils.tracking import (
     log_code_snapshot,
 )
 from opengate.recipes.utils.wrapped_recipe_model import WrappedRecipeModel
-from opengate.recipes.utils.custom_evaluate import EvaluateAnomalyModel
+from opengate.recipes.utils.anomaly_evaluate_util import EvaluateAnomalyModel, preprocess_anomaly_data, \
+    process_predictions
 from mlflow.tracking import MlflowClient
 from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.databricks_utils import (
@@ -68,7 +78,7 @@ _USER_DEFINED_TRAIN_STEP_MODULE = "steps.train"
 _logger = logging.getLogger(__name__)
 
 
-class TrainIsolationForestStep(BaseStep):
+class TrainAnomalyStep(BaseStep):
     MODEL_ARTIFACT_RELATIVE_PATH = "model"
     SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH = "sk_model"
     PREDICTED_TRAINING_DATA_RELATIVE_PATH = "predicted_training_data.parquet"
@@ -270,14 +280,25 @@ class TrainIsolationForestStep(BaseStep):
             label_encoder = LabelEncoder()
             label_encoder.fit(y_train)
             target_column_class_labels = label_encoder.classes_
-            import pandas as pd
 
             encoded_y_train = pd.Series(label_encoder.transform(y_train))
 
         if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-            estimator = self._set_autoencoder(dataset=X_train)
-            early_stopping = keras.callbacks.EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True,
-                                        min_delta=self.step_config["estimator_params"]["early_stopping_loss_delta"])
+            estimator = self._set_autoencoder(dataset_shape=X_train.shape)
+            use_early_stopping: bool = self.step_config.get("estimator_params").get("optimizer_name", False)
+            early_stopping_loss_delta: float = self.step_config.get("estimator_params").get("early_stopping_loss_delta")
+            callbacks = []
+            if use_early_stopping:
+                early_stopping = EarlyStopping(
+                    monitor="val_loss",
+                    patience=20,
+                    verbose=1,
+                    restore_best_weights=True,
+                    mode="min",
+                    min_delta=early_stopping_loss_delta,
+                )
+                callbacks.append(early_stopping)
+
             estimator.fit(
                 X_train, X_train,
                 epochs=self.step_config["estimator_params"]["epochs"],
@@ -285,11 +306,11 @@ class TrainIsolationForestStep(BaseStep):
                 validation_split=self.step_config["estimator_params"]["validation_split"],
                 shuffle=self.step_config["estimator_params"]["shuffle"],
                 #use_multiprocessing=self.step_config["estimator_params"]["use_multiprocessing"],
-                callbacks=[early_stopping] if early_stopping else None,
+                callbacks=callbacks,
                 verbose=1
             )
         else:
-            estimator.fit(X_train, encoded_y_train)
+            estimator.fit(X_train)
 
         return estimator, {"target_column_class_labels": target_column_class_labels}
 
@@ -307,8 +328,6 @@ class TrainIsolationForestStep(BaseStep):
         original_warn = warnings.warn
         warnings.warn = my_warn
         try:
-            import numpy as np
-            import pandas as pd
             import sklearn
             from sklearn.pipeline import make_pipeline
             from sklearn.utils.class_weight import compute_class_weight
@@ -331,7 +350,6 @@ class TrainIsolationForestStep(BaseStep):
                 self.task, self.positive_class, train_df, self.target_col
             )
             self.using_rebalancing = False
-            # TODO: bu if blogu silinebilir
             if self.extended_task == "classification/binary":
                 classes = np.unique(train_df[self.target_col])
                 class_weights = compute_class_weight(
@@ -376,6 +394,13 @@ class TrainIsolationForestStep(BaseStep):
                 relative_path="validation.parquet",
             )
             raw_validation_df = pd.read_parquet(raw_validation_data_path)
+
+            #if CustomModels.AUTOENCODER.category == "anomaly":
+            #    X_train = preprocess_anomaly_data(X_train)
+            #    #raw_X_train = preprocess_anomaly_data(raw_X_train)
+            #    validation_df = preprocess_autoencoder_data(validation_df)
+            #    raw_train_df = preprocess_anomaly_data(raw_train_df)
+                #raw_validation_df = preprocess_autoencoder_data(raw_validation_df)
 
             transformer_path = get_step_output_path(
                 recipe_root_path=self.recipe_root,
@@ -427,12 +452,12 @@ class TrainIsolationForestStep(BaseStep):
                 model_uri = get_step_output_path(
                     recipe_root_path=self.recipe_root,
                     step_name=self.name,
-                    relative_path=TrainIsolationForestStep.MODEL_ARTIFACT_RELATIVE_PATH,
+                    relative_path=TrainAnomalyStep.MODEL_ARTIFACT_RELATIVE_PATH,
                 )
                 sklearn_model_uri = get_step_output_path(
                     recipe_root_path=self.recipe_root,
                     step_name=self.name,
-                    relative_path=TrainIsolationForestStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    relative_path=TrainAnomalyStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                 )
                 if os.path.exists(model_uri):
                     shutil.rmtree(model_uri)
@@ -458,9 +483,11 @@ class TrainIsolationForestStep(BaseStep):
                         artifacts=artifacts,
                     )
                     tempModel = mlflow.pyfunc.load_model(pyfunc_model_tmp_path)
-                    predictions = tempModel.predict(raw_X_train.copy())
+                    preprocessed_raw_X_train = raw_X_train.copy()#preprocess_anomaly_data(raw_X_train.copy())
+                    predictions = tempModel.predict(preprocessed_raw_X_train)
                     if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-                        processed_predictions = (predictions >= self.step_config["threshold"]).astype(int)[:, 0]
+                        mse = np.mean(np.power(preprocessed_raw_X_train - predictions, 2), axis=1)
+                        processed_predictions = (mse > self.step_config["threshold"]).astype(int)
                     else:
                         processed_predictions = np.where(predictions == -1, 1, 0)
                     model_schema = infer_signature(
@@ -479,7 +506,7 @@ class TrainIsolationForestStep(BaseStep):
                 tmp_model_info = Model.load(model_uri)
                 model_data_subpath = os.path.join(
                     "artifacts",
-                    TrainIsolationForestStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    TrainAnomalyStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                     "model.pkl",
                 )
                 model_info = Model(
@@ -541,13 +568,15 @@ class TrainIsolationForestStep(BaseStep):
                         strip_prefix(k, metric_prefix): v
                         for k, v in eval_result.metrics.items()
                     }
-
-            target_data = raw_validation_df[self.target_col]
-            prediction_result = model.predict(
-                raw_validation_df.drop(self.target_col, axis=1)
-            )
+            processed_raw_validation_df = raw_validation_df# preprocess_anomaly_data(raw_validation_df)
+            target_data = processed_raw_validation_df[self.target_col]
+            processed_raw_validation_df = processed_raw_validation_df.drop(self.target_col, axis=1)
+            prediction_result = model.predict(processed_raw_validation_df)
             if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-                prediction_result = (prediction_result >= self.step_config["threshold"]).astype(int)[:, 0]
+                prediction_result = process_predictions(threshold=self.step_config["threshold"],
+                                                        model_input=processed_raw_validation_df,
+                                                        raw_predictions=prediction_result,
+                                                        model_type=self.step_config["model_type"])
             else:
                 prediction_result = np.where(prediction_result == -1, 1, 0)
 
@@ -588,13 +617,13 @@ class TrainIsolationForestStep(BaseStep):
                 }
             )
             calibrated_plot = None
-            original_train_predictions = model.predict(
-                raw_train_df.drop(self.target_col, axis=1)
-            )
+            raw_train_df_without_label = raw_train_df.drop(self.target_col, axis=1)
+            raw_train_predictions = model.predict(raw_train_df_without_label)
             if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-                train_predictions = (original_train_predictions >= self.step_config["threshold"]).astype(int)[:, 0]
+                mse = np.mean(np.power(raw_train_df_without_label - raw_train_predictions, 2), axis=1)
+                train_predictions = (mse >= self.step_config["threshold"]).astype(int)
             else:
-                train_predictions = np.where(original_train_predictions == -1, 1, 0)
+                train_predictions = np.where(raw_train_predictions == -1, 1, 0)
             if isinstance(train_predictions, pd.DataFrame) and {
                 f"{self.predict_prefix}label",
                 f"{self.predict_prefix}score",
@@ -648,7 +677,7 @@ class TrainIsolationForestStep(BaseStep):
                 )
             predicted_training_data.to_parquet(
                 os.path.join(
-                    output_directory, TrainIsolationForestStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH
+                    output_directory, TrainAnomalyStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH
                 )
             )
 
@@ -788,8 +817,6 @@ class TrainIsolationForestStep(BaseStep):
             )
 
     def _get_leaderboard_df(self, run, eval_metrics):
-        import pandas as pd
-
         mlflow_client = MlflowClient()
         exp_id = _get_experiment_id()
 
@@ -927,7 +954,6 @@ class TrainIsolationForestStep(BaseStep):
         tuning_df=None,
         calibrated_plot=None,
     ):
-        import pandas as pd
         from sklearn import set_config
         from sklearn.utils import estimator_html_repr
 
@@ -986,7 +1012,7 @@ class TrainIsolationForestStep(BaseStep):
                 os.path.join(
                     model_uri,
                     "artifacts",
-                    TrainIsolationForestStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
+                    TrainAnomalyStep.SKLEARN_MODEL_ARTIFACT_RELATIVE_PATH,
                 )
             )
         )
@@ -1217,7 +1243,7 @@ class TrainIsolationForestStep(BaseStep):
                 "predicted_training_data",
                 self.recipe_root,
                 self.name,
-                TrainIsolationForestStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH,
+                TrainAnomalyStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH,
             ),
         ]
 
@@ -1302,7 +1328,7 @@ class TrainIsolationForestStep(BaseStep):
                 manual_log_params = {}
                 for param_name, param_value in estimator_args.items():
                     if param_name in autologged_params:
-                        if not TrainIsolationForestStep.is_tuning_param_equal(
+                        if not TrainAnomalyStep.is_tuning_param_equal(
                             param_value, autologged_params[param_name]
                         ):
                             _logger.warning(
@@ -1330,7 +1356,7 @@ class TrainIsolationForestStep(BaseStep):
                 )
                 return sign * transformed_metrics[self.primary_metric]
 
-        search_space = TrainIsolationForestStep.construct_search_space_from_yaml(
+        search_space = TrainAnomalyStep.construct_search_space_from_yaml(
             tuning_params["parameters"]
         )
         algo_type, algo_name = tuning_params["algorithm"].rsplit(".", 1)
@@ -1417,9 +1443,11 @@ class TrainIsolationForestStep(BaseStep):
                 ),
             }
             mlflow.set_tags(estimator_tags)
-        predictions = estimator.predict(X_train_sampled.copy())
+        processed_x_train_sampled = X_train_sampled.copy() #preprocess_anomaly_data(X_train_sampled.copy())
+        predictions = estimator.predict(processed_x_train_sampled)
         if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-            processed_predictions = (predictions >= self.step_config["threshold"]).astype(int)[:, 0]
+            mse = np.mean(np.power(processed_x_train_sampled - predictions, 2), axis=1)
+            processed_predictions = (mse >= self.step_config["threshold"]).astype(int)
         else:
             processed_predictions = np.where(predictions == -1, 1, 0)
         estimator_schema = infer_signature(
@@ -1468,8 +1496,6 @@ class TrainIsolationForestStep(BaseStep):
             file.write("\n")
 
     def _safe_dump_with_numeric_values(self, data, file, **kwargs):
-        import numpy as np
-
         processed_data = {}
         for key, value in data.items():
             if isinstance(value, np.floating):
@@ -1485,8 +1511,6 @@ class TrainIsolationForestStep(BaseStep):
             yaml.safe_dump(processed_data, file, **kwargs)
 
     def _rebalance_classes(self, train_df):
-        import pandas as pd
-
         resampling_minority_percentage = self.step_config.get(
             "resampling_minority_percentage", _REBALANCING_DEFAULT_RATIO
         )
@@ -1524,6 +1548,111 @@ class TrainIsolationForestStep(BaseStep):
         return pd.concat([df_minority_class, df_majority_downsampled], axis=0).sample(
             frac=1
         )
+
+    def _get_regularizers(self, regularizer_type: str, regularizer_value: float) -> regularizers:
+        regularizer = None
+        match regularizer_type:
+            case "L1":
+                regularizer = regularizers.l1(regularizer_value)
+            case "L2":
+                regularizer = regularizers.l2(regularizer_value)
+            case "L1L2":
+                regularizer = regularizers.l1_l2(l1=regularizer_value, l2=regularizer_value)
+            case None:
+                pass
+            case _:
+                raise ValueError(f"Regularizer type {regularizer_type} is not available")
+        return regularizer
+
+    def _set_regularizers(self, location: str, regularizer_type: str, regularizer_value: float) -> regularizers:
+        regularizer_location: str = self.step_config.get("estimator_params", {}).get("regularizer_location", "").lower()
+        if regularizer_location == location:
+            return self._get_regularizers(regularizer_type=regularizer_type, regularizer_value=regularizer_value)
+        return None
+
+    def get_initializer(self, config_key: str, seed_key: str):
+        initializer_config: str = self.step_config.get("estimator_params", {}).get(config_key, "").lower()
+        initializer_seed: int = self.step_config.get("estimator_params", {}).get(seed_key, 55)  # Default to 55 if not specified
+        if initializer_config == "glorot_uniform":
+            return initializers.GlorotUniform(seed=initializer_seed)
+        elif initializer_config == "he_uniform":
+            return initializers.HeUniform(seed=initializer_seed)
+        return None
+
+    def _set_autoencoder(self, dataset_shape: Tuple[int, int]) -> keras.Model:
+        estimator_params = self.step_config.get("estimator_params", {})
+        regularizer_type: str = estimator_params.get("regularizer_type")
+        regularizer_value: float = estimator_params.get("regularizer_value")
+        model = Sequential()
+        kernel_regularizers = self._set_regularizers("kernel", regularizer_type=regularizer_type,
+                                                     regularizer_value=regularizer_value)
+        activation_regularizers = self._set_regularizers("activation", regularizer_type=regularizer_type,
+                                                     regularizer_value=regularizer_value)
+        first_layer_initializer = self.get_initializer("first_layer_initializer", "first_layer_initializer_seed")
+        hidden_initializer = self.get_initializer("hidden_initializer", "hidden_initializer_seed")
+        output_initializer = self.get_initializer("output_initializer", "output_initializer_seed")
+        hidden_layers_neurons = estimator_params.get("hidden_layers_neurons")
+        model.add(Dense(
+            hidden_layers_neurons[0],
+            activation=estimator_params.get("first_layer_activation"),
+            input_shape=(dataset_shape[1],),
+            kernel_initializer=first_layer_initializer,
+            kernel_regularizer=kernel_regularizers,
+            activity_regularizer=activation_regularizers
+        ))
+
+        dropout_rate = estimator_params.get("dropout_rate")
+        if dropout_rate is not None and dropout_rate != 0.0:
+            model.add(Dropout(dropout_rate))
+
+        hidden_activation = estimator_params.get("hidden_activation", "relu").lower()
+        if len(hidden_layers_neurons) > 1:
+            for hidden_neurons in hidden_layers_neurons[1:]:
+                model.add(
+                    Dense(
+                        hidden_neurons,
+                        activation=hidden_activation,
+                        kernel_initializer=hidden_initializer,
+                        kernel_regularizer=kernel_regularizers,
+                        activity_regularizer=activation_regularizers,
+                    )
+                )
+                if dropout_rate != 0.0:
+                    model.add(Dropout(dropout_rate))
+
+        output_activation = estimator_params.get("output_activation", "sigmoid").lower()
+        model.add(
+            Dense(
+                dataset_shape[1],
+                activation=output_activation,
+                kernel_initializer=output_initializer,
+                kernel_regularizer=kernel_regularizers,
+                activity_regularizer=activation_regularizers,
+            )
+        )
+        _logger.info("Autoencoder model architecture has been constructed!")
+
+        learning_type: str = estimator_params.get("learning_type", "normal").lower()
+        learning_rate: float = estimator_params.get("learning_rate", 0.01)
+        lr_schedule = learning_rate
+        if learning_type == "exponential_decay":
+            lr_schedule = ExponentialDecay(
+                initial_learning_rate=learning_rate,
+                decay_steps=estimator_params.get("decay_steps"),
+                decay_rate=estimator_params.get("decay_rate"),
+            )
+
+        optimizer_name: str = estimator_params.get("optimizer_name", "Adam")
+        if optimizer_name == "Adam":
+            loss: str = estimator_params.get("loss", "mse")
+            metrics: list = estimator_params.get("metrics")
+            model.compile(loss=loss, optimizer=Adam(learning_rate=lr_schedule), metrics=metrics)
+
+        return model
+
+    def calculate_scores(self, dataset: pd.DataFrame) -> np.ndarray:
+        ...
+"""
     def _set_autoencoder(self, dataset: pd.DataFrame) -> keras.Model:
         autoencoder_params = self.step_config["estimator_params"]
         # Define learning rate schedule based on exponential decay
@@ -1572,3 +1701,4 @@ class TrainIsolationForestStep(BaseStep):
         )
 
         return autoencoder
+"""

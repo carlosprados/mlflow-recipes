@@ -8,8 +8,8 @@ from opengate.recipes.steps.evaluate import EvaluateStep
 from opengate.recipes.steps.register import RegisterStep
 from opengate.recipes.steps.predict import PredictStep
 from opengate.recipes.steps.ingest import IngestScoringStep
-from opengate.recipes.steps.train_isolation_forest import TrainIsolationForestStep
-from opengate.recipes.steps.evaluate_isolation_forest import EvaluateIsolationForestStep
+from opengate.recipes.steps.train_anomaly import TrainAnomalyStep
+from opengate.recipes.steps.evaluate_anomaly import EvaluateIsolationForestStep
 from opengate.recipes.task_enum import MLTask
 
 def check_and_create_file(file_path: str):
@@ -66,8 +66,8 @@ class CreateMlflowFiles:
         check_and_create_folder(output_dir)
         match self.template:
             case MLTask.ANOMALY.value:
-                train_step = TrainIsolationForestStep.from_step_config_path(step_config_path=train_conf,
-                                                                            recipe_root=self.project_base_dir)
+                train_step = TrainAnomalyStep.from_step_config_path(step_config_path=train_conf,
+                                                                    recipe_root=self.project_base_dir)
             case _:
                 train_step = TrainStep.from_step_config_path(step_config_path=train_conf, recipe_root=self.project_base_dir)
         train_step.run(output_directory=output_dir)
