@@ -40,18 +40,10 @@ class EvaluateAnomalyModel:
         self.model_type = model_type
         self.labels = dataset[label_column]
 
-    #def _prepare_data_for_model(self, dataset):
-    #    """Prepare data based on model type."""
-    #    data = dataset.drop(columns=[self.label_column])
-    #    if self.model_type == CustomModels.AUTOENCODER.model_name:
-    #        data = preprocess_anomaly_data(data)
-    #    return data
-
     def evaluate_anomaly_model(self):
         # Load model
         model = load_model(self.model_uri)
         raw_data = self.dataset.drop(columns=[self.label_column])
-        #processed_data = preprocess_anomaly_data(raw_data)
         raw_predictions = model.predict(raw_data)
         predictions = process_predictions(threshold=self.threshold, model_input=raw_data, raw_predictions=raw_predictions,
                                           model_type=self.model_type)

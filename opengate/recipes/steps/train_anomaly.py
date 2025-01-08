@@ -395,13 +395,6 @@ class TrainAnomalyStep(BaseStep):
             )
             raw_validation_df = preprocess_anomaly_data(pd.read_parquet(raw_validation_data_path))
 
-            #if CustomModels.AUTOENCODER.category == "anomaly":
-            #    X_train = preprocess_anomaly_data(X_train)
-            #    #raw_X_train = preprocess_anomaly_data(raw_X_train)
-            #    validation_df = preprocess_autoencoder_data(validation_df)
-            #    raw_train_df = preprocess_anomaly_data(raw_train_df)
-                #raw_validation_df = preprocess_autoencoder_data(raw_validation_df)
-
             transformer_path = get_step_output_path(
                 recipe_root_path=self.recipe_root,
                 step_name="transform",
@@ -483,7 +476,7 @@ class TrainAnomalyStep(BaseStep):
                         artifacts=artifacts,
                     )
                     tempModel = mlflow.pyfunc.load_model(pyfunc_model_tmp_path)
-                    preprocessed_raw_X_train = raw_X_train.copy()#preprocess_anomaly_data(raw_X_train.copy())
+                    preprocessed_raw_X_train = raw_X_train.copy()
                     predictions = tempModel.predict(preprocessed_raw_X_train)
                     if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
                         processed_predictions = process_predictions(threshold=self.step_config["threshold"],
@@ -570,13 +563,12 @@ class TrainAnomalyStep(BaseStep):
                         strip_prefix(k, metric_prefix): v
                         for k, v in eval_result.metrics.items()
                     }
-            processed_raw_validation_df = raw_validation_df# preprocess_anomaly_data(raw_validation_df)
-            target_data = processed_raw_validation_df[self.target_col]
-            processed_raw_validation_df = processed_raw_validation_df.drop(self.target_col, axis=1)
-            prediction_result = model.predict(processed_raw_validation_df)
+            target_data = raw_validation_df[self.target_col]
+            raw_validation_df = raw_validation_df.drop(self.target_col, axis=1)
+            prediction_result = model.predict(raw_validation_df)
             if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
                 prediction_result = process_predictions(threshold=self.step_config["threshold"],
-                                                        model_input=processed_raw_validation_df,
+                                                        model_input=raw_validation_df,
                                                         raw_predictions=prediction_result,
                                                         model_type=self.step_config["model_type"])
             else:
@@ -1447,7 +1439,7 @@ class TrainAnomalyStep(BaseStep):
                 ),
             }
             mlflow.set_tags(estimator_tags)
-        processed_x_train_sampled = X_train_sampled.copy() #preprocess_anomaly_data(X_train_sampled.copy())
+        processed_x_train_sampled = X_train_sampled.copy()
         predictions = estimator.predict(processed_x_train_sampled)
         if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
             processed_predictions = process_predictions(threshold=self.step_config["threshold"],
@@ -1655,56 +1647,3 @@ class TrainAnomalyStep(BaseStep):
             model.compile(loss=loss, optimizer=Adam(learning_rate=lr_schedule), metrics=metrics)
 
         return model
-
-    def calculate_scores(self, dataset: pd.DataFrame) -> np.ndarray:
-        ...
-"""
-    def _set_autoencoder(self, dataset: pd.DataFrame) -> keras.Model:
-        autoencoder_params = self.step_config["estimator_params"]
-        # Define learning rate schedule based on exponential decay
-        lr_schedule = keras.optimizers.schedules.ExponentialDecay(
-            initial_learning_rate=autoencoder_params["learning_rate"],
-            decay_steps=autoencoder_params['decay_steps'],
-            decay_rate=autoencoder_params['decay_rate']
-        )
-
-        # Define the Autoencoder architecture
-        input_dim = dataset.shape[1]
-        hidden_layers_neurons = autoencoder_params['hidden_layers_neurons']
-
-        input_layer = keras.layers.Input(shape=(input_dim,))
-
-        # Define the encoder layers
-        x = keras.layers.Dense(
-            hidden_layers_neurons[0],
-            activation=autoencoder_params['first_layer_activation'],
-            kernel_initializer=keras.initializers.glorot_uniform(seed=autoencoder_params["first_layer_initializer_seed"]), # TODO: check it later
-            activity_regularizer=keras.regularizers.L1(autoencoder_params['regularizer_value'])
-        )(input_layer)
-
-        # Hidden layers with ReLU activation
-        for neurons in hidden_layers_neurons[1:-1]:
-            x = keras.layers.Dense(
-                neurons,
-                activation=autoencoder_params["hidden_activation"],
-                kernel_initializer=keras.initializers.he_uniform(seed=autoencoder_params["hidden_initializer_seed"])
-            )(x)
-
-        # Define the decoder layers
-        x = keras.layers.Dense(
-            hidden_layers_neurons[-1],
-            activation=autoencoder_params["output_activation"],
-            kernel_initializer=keras.initializers.glorot_uniform(seed=autoencoder_params["output_initializer_seed"])
-        )(x)
-
-        decoded = keras.layers.Dense(input_dim, activation=autoencoder_params["output_activation"])(x)
-
-        # Build and compile the Autoencoder model
-        autoencoder = keras.Model(inputs=input_layer, outputs=decoded)
-        autoencoder.compile(
-            optimizer=keras.optimizers.Adam(learning_rate=lr_schedule),
-            loss=autoencoder_params["loss"]
-        )
-
-        return autoencoder
-"""
