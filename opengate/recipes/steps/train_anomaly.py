@@ -345,7 +345,7 @@ class TrainAnomalyStep(BaseStep):
                 step_name="transform",
                 relative_path="transformed_training_data.parquet",
             )
-            train_df = pd.read_parquet(transformed_training_data_path)
+            train_df = preprocess_anomaly_data(pd.read_parquet(transformed_training_data_path))
             validate_classification_config(
                 self.task, self.positive_class, train_df, self.target_col
             )
@@ -378,14 +378,14 @@ class TrainAnomalyStep(BaseStep):
                 step_name="transform",
                 relative_path="transformed_validation_data.parquet",
             )
-            validation_df = pd.read_parquet(transformed_validation_data_path)
+            validation_df = preprocess_anomaly_data(pd.read_parquet(transformed_validation_data_path))
 
             raw_training_data_path = get_step_output_path(
                 recipe_root_path=self.recipe_root,
                 step_name="split",
                 relative_path="train.parquet",
             )
-            raw_train_df = pd.read_parquet(raw_training_data_path)
+            raw_train_df = preprocess_anomaly_data(pd.read_parquet(raw_training_data_path))
             raw_X_train = raw_train_df.drop(columns=[self.target_col])
 
             raw_validation_data_path = get_step_output_path(
@@ -393,7 +393,7 @@ class TrainAnomalyStep(BaseStep):
                 step_name="split",
                 relative_path="validation.parquet",
             )
-            raw_validation_df = pd.read_parquet(raw_validation_data_path)
+            raw_validation_df = preprocess_anomaly_data(pd.read_parquet(raw_validation_data_path))
 
             #if CustomModels.AUTOENCODER.category == "anomaly":
             #    X_train = preprocess_anomaly_data(X_train)
@@ -486,8 +486,10 @@ class TrainAnomalyStep(BaseStep):
                     preprocessed_raw_X_train = raw_X_train.copy()#preprocess_anomaly_data(raw_X_train.copy())
                     predictions = tempModel.predict(preprocessed_raw_X_train)
                     if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-                        mse = np.mean(np.power(preprocessed_raw_X_train - predictions, 2), axis=1)
-                        processed_predictions = (mse > self.step_config["threshold"]).astype(int)
+                        processed_predictions = process_predictions(threshold=self.step_config["threshold"],
+                                                                    model_input=preprocessed_raw_X_train,
+                                                                    raw_predictions=predictions,
+                                                                    model_type=self.step_config["model_type"])
                     else:
                         processed_predictions = np.where(predictions == -1, 1, 0)
                     model_schema = infer_signature(
@@ -620,8 +622,10 @@ class TrainAnomalyStep(BaseStep):
             raw_train_df_without_label = raw_train_df.drop(self.target_col, axis=1)
             raw_train_predictions = model.predict(raw_train_df_without_label)
             if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-                mse = np.mean(np.power(raw_train_df_without_label - raw_train_predictions, 2), axis=1)
-                train_predictions = (mse >= self.step_config["threshold"]).astype(int)
+                train_predictions = process_predictions(threshold=self.step_config["threshold"],
+                                                        model_input=raw_train_df_without_label,
+                                                        raw_predictions=raw_train_predictions,
+                                                        model_type=self.step_config["model_type"])
             else:
                 train_predictions = np.where(raw_train_predictions == -1, 1, 0)
             if isinstance(train_predictions, pd.DataFrame) and {
@@ -1446,8 +1450,10 @@ class TrainAnomalyStep(BaseStep):
         processed_x_train_sampled = X_train_sampled.copy() #preprocess_anomaly_data(X_train_sampled.copy())
         predictions = estimator.predict(processed_x_train_sampled)
         if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-            mse = np.mean(np.power(processed_x_train_sampled - predictions, 2), axis=1)
-            processed_predictions = (mse >= self.step_config["threshold"]).astype(int)
+            processed_predictions = process_predictions(threshold=self.step_config["threshold"],
+                                                        model_input=processed_x_train_sampled,
+                                                        raw_predictions=predictions,
+                                                        model_type=self.step_config["model_type"])
         else:
             processed_predictions = np.where(predictions == -1, 1, 0)
         estimator_schema = infer_signature(

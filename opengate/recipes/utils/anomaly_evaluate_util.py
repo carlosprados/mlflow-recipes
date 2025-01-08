@@ -68,9 +68,7 @@ class EvaluateAnomalyModel:
                 if metric.name == "roc_auc_score":
                     match self.model_type:
                         case CustomModels.AUTOENCODER.model_name:
-                            # Calculation average value of first dimension as a score
-                            #normalized_scores = np.mean(raw_predictions, axis=1)
-                            normalized_scores = raw_predictions.max(axis=1)
+                            normalized_scores = np.mean(np.power(raw_data - raw_predictions, 2), axis=1)
                         case CustomModels.ISOLATION_FOREST.model_name:
                             # Negating as higher scores indicate normal in IF
                             scores = -model.decision_function(raw_data)
@@ -82,6 +80,10 @@ class EvaluateAnomalyModel:
                             )
                     optimal_threshold = self.save_roc_curve(prediction_scores=normalized_scores)
                     self.threshold = self.threshold if self.threshold is not None else optimal_threshold
+                    # Autoencoder threshold calculation different. Therefore, added below if statement. Info below link
+                    # https://github.com/Gradiant/SYP-SecBluRed-PR-1465-UEBA/blob/04c36060c944cd1ce75b06cf5552be002ec65886/src/secblured/models/autoencoder.py#L163
+                    if self.model_type == CustomModels.AUTOENCODER.model_name:
+                        self.threshold = np.quantile(normalized_scores, self.threshold)
                     self.save_cm(scores=normalized_scores)
             except AttributeError as ae:
                 _logger.error(f"Metric '{metric.name}' not found in sklearn.metrics: {ae}")
@@ -120,6 +122,8 @@ class EvaluateAnomalyModel:
     def save_cm(self, scores):
         try:
             # Predict using the optimal threshold
+            if CustomModels.AUTOENCODER.model_name == "autoencoder":
+                self.threshold = np.quantile(scores, self.threshold)
             predicted_labels = (scores >= self.threshold).astype(int)
             cm = confusion_matrix(self.labels, predicted_labels, labels=[0, 1])
             disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Benign", "Malign"])
@@ -167,5 +171,5 @@ def process_predictions(threshold: float, model_input: pd.DataFrame, raw_predict
     if model_type == CustomModels.AUTOENCODER.model_name:
         mse = np.mean(np.power(model_input - raw_predictions, 2), axis=1)
         processed_threshold = np.quantile(mse, threshold)
-        return (mse >= processed_threshold).astype(int)
+        return (mse > processed_threshold).astype(int).to_numpy()
     return np.where(raw_predictions == -1, 1, 0)

@@ -15,7 +15,7 @@ from opengate.recipes.cards import BaseCard
 from opengate.recipes.dataset_split_enum import DatasetSplit
 from opengate.recipes.step import BaseStep, StepClass
 from opengate.recipes.steps.train import TrainStep
-from opengate.recipes.utils.anomaly_evaluate_util import EvaluateAnomalyModel
+from opengate.recipes.utils.anomaly_evaluate_util import EvaluateAnomalyModel, preprocess_anomaly_data
 from opengate.recipes.utils.metrics import (
     _get_builtin_metrics,
     _get_custom_metrics,
@@ -204,6 +204,8 @@ class EvaluateIsolationForestStep(BaseStep):
             )
 
             with mlflow.start_run(run_id=run_id):
+                validation_df = preprocess_anomaly_data(validation_df)
+                test_df = preprocess_anomaly_data(test_df)
                 eval_metrics = {}
                 for dataset_name, dataset, evaluator_config in (
                     (
