@@ -54,8 +54,8 @@ from opengate.recipes.utils.tracking import (
     log_code_snapshot,
 )
 from opengate.recipes.utils.wrapped_recipe_model import WrappedRecipeModel
-from opengate.recipes.utils.anomaly_evaluate_util import EvaluateAnomalyModel, preprocess_anomaly_data, \
-    process_predictions
+from opengate.recipes.utils.anomaly_evaluate_util import EvaluateAnomalyModel, process_predictions, \
+    preprocess_anomaly_data
 from mlflow.tracking import MlflowClient
 from mlflow.tracking.fluent import _get_experiment_id
 from mlflow.utils.databricks_utils import (
@@ -345,7 +345,7 @@ class TrainAnomalyStep(BaseStep):
                 step_name="transform",
                 relative_path="transformed_training_data.parquet",
             )
-            train_df = preprocess_anomaly_data(pd.read_parquet(transformed_training_data_path))
+            train_df = pd.read_parquet(transformed_training_data_path)
             validate_classification_config(
                 self.task, self.positive_class, train_df, self.target_col
             )
@@ -378,14 +378,14 @@ class TrainAnomalyStep(BaseStep):
                 step_name="transform",
                 relative_path="transformed_validation_data.parquet",
             )
-            validation_df = preprocess_anomaly_data(pd.read_parquet(transformed_validation_data_path))
+            validation_df = pd.read_parquet(transformed_validation_data_path)
 
             raw_training_data_path = get_step_output_path(
                 recipe_root_path=self.recipe_root,
                 step_name="split",
                 relative_path="train.parquet",
             )
-            raw_train_df = preprocess_anomaly_data(pd.read_parquet(raw_training_data_path))
+            raw_train_df = pd.read_parquet(raw_training_data_path)
             raw_X_train = raw_train_df.drop(columns=[self.target_col])
 
             raw_validation_data_path = get_step_output_path(
@@ -393,7 +393,7 @@ class TrainAnomalyStep(BaseStep):
                 step_name="split",
                 relative_path="validation.parquet",
             )
-            raw_validation_df = preprocess_anomaly_data(pd.read_parquet(raw_validation_data_path))
+            raw_validation_df = pd.read_parquet(raw_validation_data_path)
 
             transformer_path = get_step_output_path(
                 recipe_root_path=self.recipe_root,
@@ -476,18 +476,18 @@ class TrainAnomalyStep(BaseStep):
                         artifacts=artifacts,
                     )
                     tempModel = mlflow.pyfunc.load_model(pyfunc_model_tmp_path)
-                    preprocessed_raw_X_train = raw_X_train.copy()
-                    predictions = tempModel.predict(preprocessed_raw_X_train)
+                    copied_raw_X_train = raw_X_train.copy()
+                    predictions = tempModel.predict(copied_raw_X_train)
                     if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
                         processed_predictions = process_predictions(threshold=self.step_config["threshold"],
-                                                                    model_input=preprocessed_raw_X_train,
+                                                                    model_input=copied_raw_X_train,
                                                                     raw_predictions=predictions,
                                                                     model_type=self.step_config["model_type"])
                     else:
                         processed_predictions = np.where(predictions == -1, 1, 0)
                     model_schema = infer_signature(
-                        raw_X_train, processed_predictions
-                    )
+                        preprocess_anomaly_data(dataset=raw_X_train, recipe_root=self.recipe_root,
+                                                target_col=self.target_col, is_train_step=True), processed_predictions)
                     mlflow.pyfunc.save_model(
                         path=model_uri,
                         python_model=wrapped_model,
@@ -565,7 +565,9 @@ class TrainAnomalyStep(BaseStep):
                     }
             target_data = raw_validation_df[self.target_col]
             raw_validation_df = raw_validation_df.drop(self.target_col, axis=1)
-            prediction_result = model.predict(raw_validation_df)
+            prediction_result = model.predict(
+                preprocess_anomaly_data(dataset=raw_validation_df, recipe_root=self.recipe_root,
+                                        target_col=self.target_col, is_train_step=True))
             if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
                 prediction_result = process_predictions(threshold=self.step_config["threshold"],
                                                         model_input=raw_validation_df,
@@ -612,7 +614,9 @@ class TrainAnomalyStep(BaseStep):
             )
             calibrated_plot = None
             raw_train_df_without_label = raw_train_df.drop(self.target_col, axis=1)
-            raw_train_predictions = model.predict(raw_train_df_without_label)
+            raw_train_predictions = model.predict(
+                preprocess_anomaly_data(dataset=raw_train_df_without_label, recipe_root=self.recipe_root,
+                                        target_col=self.target_col, is_train_step=True))
             if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
                 train_predictions = process_predictions(threshold=self.step_config["threshold"],
                                                         model_input=raw_train_df_without_label,

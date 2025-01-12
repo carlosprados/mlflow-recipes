@@ -72,10 +72,6 @@ class EvaluateAnomalyModel:
                             )
                     optimal_threshold = self.save_roc_curve(prediction_scores=normalized_scores)
                     self.threshold = self.threshold if self.threshold is not None else optimal_threshold
-                    # Autoencoder threshold calculation different. Therefore, added below if statement. Info below link
-                    # https://github.com/Gradiant/SYP-SecBluRed-PR-1465-UEBA/blob/04c36060c944cd1ce75b06cf5552be002ec65886/src/secblured/models/autoencoder.py#L163
-                    if self.model_type == CustomModels.AUTOENCODER.model_name:
-                        self.threshold = np.quantile(normalized_scores, self.threshold)
                     self.save_cm(scores=normalized_scores)
             except AttributeError as ae:
                 _logger.error(f"Metric '{metric.name}' not found in sklearn.metrics: {ae}")
@@ -113,10 +109,11 @@ class EvaluateAnomalyModel:
 
     def save_cm(self, scores):
         try:
-            # Predict using the optimal threshold
-            if CustomModels.AUTOENCODER.model_name == "autoencoder":
+            # Autoencoder threshold calculation different. Therefore, added below if statement. Info below link
+            # https://github.com/Gradiant/SYP-SecBluRed-PR-1465-UEBA/blob/04c36060c944cd1ce75b06cf5552be002ec65886/src/secblured/models/autoencoder.py#L163
+            if CustomModels.AUTOENCODER.model_name == self.model_type:
                 self.threshold = np.quantile(scores, self.threshold)
-            predicted_labels = (scores >= self.threshold).astype(int)
+            predicted_labels = (scores > self.threshold).astype(int).to_numpy()
             cm = confusion_matrix(self.labels, predicted_labels, labels=[0, 1])
             disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=["Benign", "Malign"])
             disp.plot(cmap=plt.cm.Blues, values_format='d')
@@ -147,21 +144,31 @@ class EvaluateAnomalyModel:
         return extra_calculated_metrics
 
 
-def preprocess_anomaly_data(X_train: pd.DataFrame) -> pd.DataFrame:
-    preprocess_pipeline = Pipeline(
-        [
-            ("transformer", RobustScaler()),
-            ("norm", MinMaxScaler(feature_range=(0, 1))),
-        ]
+def preprocess_anomaly_data(dataset: pd.DataFrame, recipe_root: str, target_col: str, is_train_step=False) -> pd.DataFrame:
+    from opengate.recipes.utils.execution import get_step_output_path
+    import joblib
+    transformer_path = get_step_output_path(
+        recipe_root_path=recipe_root,
+        step_name="transform",
+        relative_path="transformer.pkl",
     )
-    transformed_data = preprocess_pipeline.fit_transform(X_train)
-    return pd.DataFrame(transformed_data, columns=X_train.columns, index=X_train.index)
+    transformers = joblib.load(transformer_path)
+    labels = None
+    if not is_train_step:
+        labels = dataset[target_col]
+        dataset = dataset.drop(columns=[target_col])
+    transformed_array = transformers.transform(dataset)
+    transformed_data = pd.DataFrame(transformed_array, columns=dataset.columns, index=dataset.index)
+    if labels is not None:
+        transformed_data[target_col] = labels
+    return transformed_data
 
 def process_predictions(threshold: float, model_input: pd.DataFrame, raw_predictions: pd.DataFrame,
                         model_type: str) -> np.ndarray:
-    """Process raw predictions based on model type."""
+    """Process raw predictions based on model type and return final predictions"""
     if model_type == CustomModels.AUTOENCODER.model_name:
         mse = np.mean(np.power(model_input - raw_predictions, 2), axis=1)
         processed_threshold = np.quantile(mse, threshold)
-        return (mse > processed_threshold).astype(int).to_numpy()
+        labels = (mse > processed_threshold).astype(int).to_numpy()
+        return labels
     return np.where(raw_predictions == -1, 1, 0)

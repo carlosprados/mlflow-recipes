@@ -53,7 +53,7 @@ MetricValidationResult = namedtuple(
 )
 
 
-class EvaluateIsolationForestStep(BaseStep):
+class EvaluateAnomalyStep(BaseStep):
     def __init__(self, step_config: dict[str, Any], recipe_root: str) -> None:
         super().__init__(step_config, recipe_root)
         self.tracking_config = TrackingConfig.from_dict(self.step_config)
@@ -167,7 +167,8 @@ class EvaluateIsolationForestStep(BaseStep):
                 step_name="split",
                 relative_path="test.parquet",
             )
-            test_df = pd.read_parquet(test_df_path)
+            test_df = preprocess_anomaly_data(dataset=pd.read_parquet(test_df_path), recipe_root=self.recipe_root,
+                                              target_col=self.target_col)
             validate_classification_config(
                 self.task, self.positive_class, test_df, self.target_col
             )
@@ -177,7 +178,8 @@ class EvaluateIsolationForestStep(BaseStep):
                 step_name="split",
                 relative_path="validation.parquet",
             )
-            validation_df = pd.read_parquet(validation_df_path)
+            validation_df = preprocess_anomaly_data(dataset=pd.read_parquet(validation_df_path),
+                                                    recipe_root=self.recipe_root, target_col=self.target_col)
 
             run_id_path = get_step_output_path(
                 recipe_root_path=self.recipe_root,
@@ -204,8 +206,6 @@ class EvaluateIsolationForestStep(BaseStep):
             )
 
             with mlflow.start_run(run_id=run_id):
-                validation_df = preprocess_anomaly_data(validation_df)
-                test_df = preprocess_anomaly_data(test_df)
                 eval_metrics = {}
                 for dataset_name, dataset, evaluator_config in (
                     (

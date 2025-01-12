@@ -9,7 +9,8 @@ from opengate.recipes.steps.register import RegisterStep
 from opengate.recipes.steps.predict import PredictStep
 from opengate.recipes.steps.ingest import IngestScoringStep
 from opengate.recipes.steps.train_anomaly import TrainAnomalyStep
-from opengate.recipes.steps.evaluate_anomaly import EvaluateIsolationForestStep
+from opengate.recipes.steps.evaluate_anomaly import EvaluateAnomalyStep
+from opengate.recipes.steps.transform_anomaly import TransformAnomalyStep
 from opengate.recipes.task_enum import MLTask
 
 def check_and_create_file(file_path: str):
@@ -55,7 +56,13 @@ class CreateMlflowFiles:
         check_and_create_file(transform_conf)
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "transform/outputs")
         check_and_create_folder(output_dir)
-        transform_step = TransformStep.from_step_config_path(step_config_path=transform_conf, recipe_root=self.project_base_dir)
+        match self.template:
+            case MLTask.ANOMALY.value:
+                transform_step = TransformAnomalyStep.from_step_config_path(step_config_path=transform_conf,
+                                                             recipe_root=self.project_base_dir)
+            case _:
+                transform_step = TransformStep.from_step_config_path(step_config_path=transform_conf,
+                                                             recipe_root=self.project_base_dir)
         transform_step.run(output_directory=output_dir)
         print("Transform step completed")
 
@@ -80,8 +87,8 @@ class CreateMlflowFiles:
         check_and_create_folder(output_dir)
         match self.template:
             case MLTask.ANOMALY.value:
-                evaluate_step = EvaluateIsolationForestStep.from_step_config_path(step_config_path=evaluate_conf,
-                                                                                  recipe_root=self.project_base_dir)
+                evaluate_step = EvaluateAnomalyStep.from_step_config_path(step_config_path=evaluate_conf,
+                                                                          recipe_root=self.project_base_dir)
             case _:
                 evaluate_step = EvaluateStep.from_step_config_path(step_config_path=evaluate_conf,
                                                                    recipe_root=self.project_base_dir)
