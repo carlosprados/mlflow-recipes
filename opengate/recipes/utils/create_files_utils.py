@@ -2,6 +2,7 @@ import os
 
 from opengate.recipes.steps.ingest import IngestStep
 from opengate.recipes.steps.split import SplitStep
+from opengate.recipes.steps.split_anomaly import SplitAnomalyStep
 from opengate.recipes.steps.transform import TransformStep
 from opengate.recipes.steps.train import TrainStep
 from opengate.recipes.steps.evaluate import EvaluateStep
@@ -47,7 +48,10 @@ class CreateMlflowFiles:
         check_and_create_file(split_conf)
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "split/outputs")
         check_and_create_folder(output_dir)
-        split_step = SplitStep.from_step_config_path(step_config_path=split_conf, recipe_root=self.project_base_dir)
+        step_class = {
+            MLTask.ANOMALY.value: SplitAnomalyStep,
+        }.get(self.template, SplitStep)
+        split_step = step_class.from_step_config_path(step_config_path=split_conf, recipe_root=self.project_base_dir)
         split_step.run(output_directory=output_dir)
         print("Split step completed")
 
@@ -56,13 +60,11 @@ class CreateMlflowFiles:
         check_and_create_file(transform_conf)
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "transform/outputs")
         check_and_create_folder(output_dir)
-        match self.template:
-            case MLTask.ANOMALY.value:
-                transform_step = TransformAnomalyStep.from_step_config_path(step_config_path=transform_conf,
-                                                             recipe_root=self.project_base_dir)
-            case _:
-                transform_step = TransformStep.from_step_config_path(step_config_path=transform_conf,
-                                                             recipe_root=self.project_base_dir)
+        step_class = {
+            MLTask.ANOMALY.value: TransformAnomalyStep,
+        }.get(self.template, TransformStep)
+        transform_step = step_class.from_step_config_path(step_config_path=transform_conf,
+                                                          recipe_root=self.project_base_dir)
         transform_step.run(output_directory=output_dir)
         print("Transform step completed")
 
@@ -71,12 +73,12 @@ class CreateMlflowFiles:
         check_and_create_file(train_conf)
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "train/outputs")
         check_and_create_folder(output_dir)
-        match self.template:
-            case MLTask.ANOMALY.value:
-                train_step = TrainAnomalyStep.from_step_config_path(step_config_path=train_conf,
-                                                                    recipe_root=self.project_base_dir)
-            case _:
-                train_step = TrainStep.from_step_config_path(step_config_path=train_conf, recipe_root=self.project_base_dir)
+
+        step_class = {
+            MLTask.ANOMALY.value: TrainAnomalyStep,
+        }.get(self.template, TrainStep)
+        train_step = step_class.from_step_config_path(step_config_path=train_conf, recipe_root=self.project_base_dir)
+
         train_step.run(output_directory=output_dir)
         print("Train step completed")
 
@@ -85,13 +87,12 @@ class CreateMlflowFiles:
         check_and_create_file(evaluate_conf)
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "evaluate/outputs")
         check_and_create_folder(output_dir)
-        match self.template:
-            case MLTask.ANOMALY.value:
-                evaluate_step = EvaluateAnomalyStep.from_step_config_path(step_config_path=evaluate_conf,
-                                                                          recipe_root=self.project_base_dir)
-            case _:
-                evaluate_step = EvaluateStep.from_step_config_path(step_config_path=evaluate_conf,
-                                                                   recipe_root=self.project_base_dir)
+
+        step_class = {
+            MLTask.ANOMALY.value: EvaluateAnomalyStep,
+        }.get(self.template, EvaluateStep)
+        evaluate_step = step_class.from_step_config_path(step_config_path=evaluate_conf, recipe_root=self.project_base_dir)
+
         evaluate_step.run(output_directory=output_dir)
         print("Evaluate step completed")
 
