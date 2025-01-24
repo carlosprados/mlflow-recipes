@@ -60,11 +60,7 @@ class EvaluateAnomalyStep(BaseStep):
 
     def _validate_and_apply_step_config(self):
         self.target_col = self.step_config.get("target_col")
-        if self.target_col is None:
-            raise MlflowException(
-                "Missing target_col config in recipe config.",
-                error_code=INVALID_PARAMETER_VALUE,
-            )
+
         self.recipe = self.step_config.get("recipe")
         if self.recipe is None:
             raise MlflowException(

@@ -96,7 +96,7 @@ def _get_error_fn(tmpl: str, use_probability: bool = False, positive_class: Opti
     if tmpl == "regression/v1":
         return lambda predictions, targets: predictions - targets
     if tmpl == "anomaly/v1":
-        return lambda predictions, target: np.power(target - predictions, 2)
+        return lambda predictions, target: np.mean(np.power(target - predictions, 2), axis=1)
     if tmpl == "classification/v1":
         if use_probability:
             # It computes error rate for binary classification since

@@ -354,18 +354,13 @@ class BaseStep(metaclass=abc.ABCMeta):
             )
 
     @staticmethod
-    def _generate_worst_examples_dataframe(
-        dataframe,
-        predictions,
-        error,
-        target_col,
-        worst_k=10,
-    ):
+    def _generate_worst_examples_dataframe(dataframe, predictions, error, target_col, worst_k=10, task=None):
         """
         Generate dataframe containing worst k examples with largest prediction error.
         Dataframe contains columns of all features, prediction, error, and target_col column.
         The prediction error is defined as absolute error between target value and
         prediction value.
+        :param task:
         """
         import numpy as np
 
@@ -376,7 +371,9 @@ class BaseStep(metaclass=abc.ABCMeta):
             prediction=predictions[worst_k_indexes],
             absolute_error=abs_error[worst_k_indexes],
         )
-        front_columns = ["absolute_error", "prediction", target_col]
+        front_columns = ["absolute_error", "prediction"]
+        if task is not None and task != "anomaly":
+            front_columns = ["absolute_error", "prediction", target_col]
         reordered_columns = (
             front_columns + result_df.columns.drop(front_columns).tolist()
         )

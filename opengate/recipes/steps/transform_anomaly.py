@@ -75,11 +75,6 @@ class TransformAnomalyStep(BaseStep):
     def _validate_and_apply_step_config(self):
         self.target_col = self.step_config.get("target_col")
         self.positive_class = self.step_config.get("positive_class")
-        if self.target_col is None:
-            raise MlflowException(
-                "Missing target_col config in recipe config.",
-                error_code=INVALID_PARAMETER_VALUE,
-            )
         if "using" in self.step_config:
             if self.step_config["using"] not in ["custom"]:
                 raise MlflowException(
@@ -98,7 +93,6 @@ class TransformAnomalyStep(BaseStep):
         from opengate.recipes.utils.execution import get_step_output_path
 
         run_start_time = time.time()
-
         train_data_path = get_step_output_path(
             recipe_root_path=self.recipe_root,
             step_name="split",
@@ -142,10 +136,11 @@ class TransformAnomalyStep(BaseStep):
             )
             transformer = _validate_user_code_output(transformer_fn)
         transformer = transformer if transformer else get_identity_transformer()
-        transformer.fit(train_df.drop(columns=[self.target_col]))
+        columns_to_drop = [self.target_col] if self.target_col is not None else []
+        transformer.fit(train_df.drop(columns=columns_to_drop))
 
         def transform_dataset(dataset):
-            features = dataset.drop(columns=[self.target_col])
+            features = dataset.drop(columns=columns_to_drop)
             transformed_features = transformer.transform(features)
             if not isinstance(transformed_features, pd.DataFrame):
                 num_features = transformed_features.shape[1]
@@ -155,7 +150,8 @@ class TransformAnomalyStep(BaseStep):
                 transformed_features = pd.DataFrame(
                     transformed_features, columns=columns
                 )
-            transformed_features[self.target_col] = dataset[self.target_col].values
+            if self.target_col is not None:
+                transformed_features[self.target_col] = dataset[self.target_col].values
             return transformed_features
 
         train_transformed = transform_dataset(train_df)

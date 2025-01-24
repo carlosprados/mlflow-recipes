@@ -3,8 +3,6 @@ import sys
 
 import pandas as pd
 from mlflow.exceptions import BAD_REQUEST, MlflowException
-from sklearn.pipeline import Pipeline
-from sklearn.preprocessing import RobustScaler, MinMaxScaler
 
 from opengate.recipes.custom_models_enum import CustomModels
 from opengate.recipes.utils.metrics import BUILTIN_ANOMALY_RECIPE_METRICS
@@ -19,7 +17,7 @@ from mlflow import log_metric, log_artifact
 
 from importlib import import_module
 import importlib.util as importlib_utils
-from typing import List
+from typing import List, Union
 import matplotlib.pyplot as plt
 
 import logging
@@ -38,12 +36,13 @@ class EvaluateAnomalyModel:
         self.extra_metrics = extra_metrics
         self.threshold: float = threshold
         self.model_type = model_type
-        self.labels = dataset[label_column]
+        self.labels = dataset[label_column] if label_column is not None else []
 
     def evaluate_anomaly_model(self):
         # Load model
         model = load_model(self.model_uri)
-        raw_data = self.dataset.drop(columns=[self.label_column])
+        column_to_drop = [self.label_column] if self.label_column is not None else []
+        raw_data = self.dataset.drop(columns=column_to_drop)
         raw_predictions = model.predict(raw_data)
         predictions = process_predictions(threshold=self.threshold, model_input=raw_data, raw_predictions=raw_predictions,
                                           model_type=self.model_type)
@@ -78,8 +77,9 @@ class EvaluateAnomalyModel:
             except Exception as e:
                 _logger.error(f"Error calculating metric '{metric.name}': {e}")
 
-        calculated_extra_metrics = self.evaluate_custom_metrics(metrics=self.extra_metrics, predictions=predictions)
-        calculated_metrics.update(calculated_extra_metrics)
+        if self.extra_metrics is not None:
+            calculated_extra_metrics = self.evaluate_custom_metrics(metrics=self.extra_metrics, predictions=predictions)
+            calculated_metrics.update(calculated_extra_metrics)
         return EvaluationResult(artifacts=artifacts, metrics=calculated_metrics)
 
     def save_roc_curve(self, prediction_scores):
@@ -153,22 +153,65 @@ def preprocess_anomaly_data(dataset: pd.DataFrame, recipe_root: str, target_col:
         relative_path="transformer.pkl",
     )
     transformers = joblib.load(transformer_path)
-    labels = None
-    if not is_train_step:
-        labels = dataset[target_col]
-        dataset = dataset.drop(columns=[target_col])
     transformed_array = transformers.transform(dataset)
     transformed_data = pd.DataFrame(transformed_array, columns=dataset.columns, index=dataset.index)
-    if labels is not None:
-        transformed_data[target_col] = labels
+
     return transformed_data
 
-def process_predictions(threshold: float, model_input: pd.DataFrame, raw_predictions: pd.DataFrame,
-                        model_type: str) -> np.ndarray:
-    """Process raw predictions based on model type and return final predictions"""
+def process_predictions(
+    threshold: Union[float, np.floating],
+    model_input: pd.DataFrame,
+    raw_predictions: pd.DataFrame,
+    model_type: str
+) -> np.ndarray:
+    """
+    Process raw predictions based on model type and return final labels.
+
+    Args:
+        threshold (float): Quantile threshold for anomaly detection.
+        model_input (pd.DataFrame): Input data used for the model.
+        raw_predictions (pd.DataFrame): Raw predictions from the model.
+        model_type (str): Type of model (e.g., AUTOENCODER).
+
+    Returns:
+        np.ndarray: Binary labels indicating anomalies (1) or normal (0).
+    """
     if model_type == CustomModels.AUTOENCODER.model_name:
-        mse = np.mean(np.power(model_input - raw_predictions, 2), axis=1)
-        processed_threshold = np.quantile(mse, threshold)
-        labels = (mse > processed_threshold).astype(int).to_numpy()
-        return labels
+        mse = compute_mean_squared_error(model_input, raw_predictions)
+        threshold_value = np.quantile(mse, threshold)
+        return (mse > threshold_value).astype(int)
+
+    # For isolation forest models, map raw_predictions to binary labels directly.
     return np.where(raw_predictions == -1, 1, 0)
+
+def calculate_threshold_quantile(
+    x_train: pd.DataFrame,
+    predictions: pd.DataFrame,
+    threshold: float
+) -> np.float64:
+    """
+    Calculate the quantile threshold based on Mean Squared Error (MSE).
+
+    Args:
+        x_train (pd.DataFrame): Training data used to generate predictions.
+        predictions (pd.DataFrame): Predicted values corresponding to the training data.
+        threshold (float): Desired quantile threshold.
+
+    Returns:
+        float: Calculated quantile threshold.
+    """
+    mse = compute_mean_squared_error(x_train, predictions)
+    return np.quantile(mse, threshold)
+
+def compute_mean_squared_error(input_data: pd.DataFrame, predictions: Union[pd.DataFrame, np.ndarray]) -> np.ndarray:
+    """
+    Compute the Mean Squared Error (MSE) between input data and predictions.
+
+    Args:
+        input_data (pd.DataFrame): Original input data.
+        predictions (Union[pd.DataFrame, np.ndarray]): Predicted values.
+
+    Returns:
+        np.ndarray: Array of MSE values for each input row.
+    """
+    return np.mean(np.power(input_data - predictions, 2), axis=1)

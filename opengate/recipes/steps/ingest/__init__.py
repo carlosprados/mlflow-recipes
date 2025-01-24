@@ -16,6 +16,7 @@ from opengate.recipes.steps.ingest.datasets import (
     ParquetDataset,
     SparkSqlDataset,
 )
+from opengate.recipes.task_enum import MLTask
 from opengate.recipes.utils.step import (
     get_pandas_data_profiles,
     validate_classification_config,
@@ -54,7 +55,8 @@ class BaseIngestStep(BaseStep, metaclass=abc.ABCMeta):
 
         if self.step_class() == StepClass.TRAINING:
             self.target_col = self.step_config.get("target_col")
-            if self.target_col is None:
+            # if template is Anomaly, target_col is not required
+            if self.target_col is None and self.step_config.get("recipe") != MLTask.ANOMALY.value:
                 raise MlflowException(
                     "Missing target_col config in recipe config.",
                     error_code=INVALID_PARAMETER_VALUE,
@@ -87,7 +89,8 @@ class BaseIngestStep(BaseStep, metaclass=abc.ABCMeta):
 
         ingested_df = read_parquet_as_pandas_df(data_parquet_path=dataset_dst_path)
         if self.step_class() == StepClass.TRAINING:
-            if self.target_col not in ingested_df.columns:
+            # target_col is not necessary for anomaly
+            if self.target_col not in ingested_df.columns and self.step_config.get("recipe") != MLTask.ANOMALY.value:
                 raise MlflowException(
                     f"Target column '{self.target_col}' not found in ingested dataset.",
                     error_code=INVALID_PARAMETER_VALUE,

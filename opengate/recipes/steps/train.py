@@ -580,17 +580,13 @@ class TrainStep(BaseStep):
                     ].values,
                 )
                 if self.positive_class:
-                    worst_examples_df = BaseStep._generate_worst_examples_dataframe(
-                        raw_train_df,
-                        train_predictions[f"{self.predict_prefix}label"].values,
-                        error_fn(
-                            train_predictions[
-                                f"{self.predict_prefix}score_{self.positive_class}"
-                            ].values,
-                            raw_train_df[self.target_col].to_numpy(),
-                        ),
-                        self.target_col,
-                    )
+                    worst_examples_df = BaseStep._generate_worst_examples_dataframe(raw_train_df, train_predictions[
+                        f"{self.predict_prefix}label"].values, error_fn(
+                        train_predictions[
+                            f"{self.predict_prefix}score_{self.positive_class}"
+                        ].values,
+                        raw_train_df[self.target_col].to_numpy(),
+                    ), self.target_col)
 
                     if "calibrate_proba" in self.step_config and hasattr(
                         additional_fitted_args.get("original_estimator"),
@@ -612,14 +608,11 @@ class TrainStep(BaseStep):
                 predicted_training_data = raw_train_df.assign(
                     predicted_data=train_predictions
                 )
-                worst_examples_df = BaseStep._generate_worst_examples_dataframe(
-                    raw_train_df,
-                    train_predictions,
-                    error_fn(
-                        train_predictions, raw_train_df[self.target_col].to_numpy()
-                    ),
-                    self.target_col,
-                )
+                worst_examples_df = BaseStep._generate_worst_examples_dataframe(raw_train_df, train_predictions,
+                                                                                error_fn(
+                                                                                    train_predictions, raw_train_df[
+                                                                                        self.target_col].to_numpy()
+                                                                                ), self.target_col)
             predicted_training_data.to_parquet(
                 os.path.join(
                     output_directory, TrainStep.PREDICTED_TRAINING_DATA_RELATIVE_PATH
