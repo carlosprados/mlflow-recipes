@@ -9,7 +9,7 @@ setuptools==65.5.0
 wheel==0.45.1
 keras==2.15.0
 tensorflow==2.15.0.post1
-twine
+twine==6.1.0
 sphinx
-sphinx-rtd-theme
-myst-parser
+sphinx-rtd-theme==3.0.2
+myst-parser==4.0.0
