@@ -551,11 +551,8 @@ class TrainStep(BaseStep):
                 ].values
             else:
                 prediction_result_for_error = prediction_result
-            error_fn = _get_error_fn(
-                self.recipe,
-                use_probability=use_probability_for_error_rate,
-                positive_class=self.positive_class,
-            )
+            error_fn = _get_error_fn(self.recipe, use_probability=use_probability_for_error_rate,
+                                     positive_class=self.positive_class)
             pred_and_error_df = pd.DataFrame(
                 {
                     "target": target_data,

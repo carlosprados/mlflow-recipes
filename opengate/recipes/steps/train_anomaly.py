@@ -408,11 +408,12 @@ class TrainAnomalyStep(BaseStep):
             run_name = self.tracking_config.run_name
             best_estimator_params = None
             mlflow.autolog(log_models=False, silent=True)
+            model_type = self.step_config["model_type"]
             with mlflow.start_run(run_name=run_name, tags=tags) as run:
                 estimator = self._resolve_estimator(
                     X_train, y_train, validation_df, run, output_directory
                 )
-                best_estimator_params = estimator.get_config() if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name else estimator.get_params()
+                best_estimator_params = estimator.get_config() if model_type == CustomModels.AUTOENCODER.model_name else estimator.get_params()
                 fitted_estimator, additional_fitted_args = self._fitted_estimator(
                     estimator, X_train, y_train
                 )
@@ -475,16 +476,15 @@ class TrainAnomalyStep(BaseStep):
                     tempModel = mlflow.pyfunc.load_model(pyfunc_model_tmp_path)
                     copied_raw_X_train = raw_X_train.copy()
                     predictions = tempModel.predict(copied_raw_X_train)
-                    #if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-                    #    processed_predictions = process_predictions(threshold=self.step_config["threshold"],
-                    #                                                model_input=copied_raw_X_train,
-                    #                                                raw_predictions=predictions,
-                    #                                                model_type=self.step_config["model_type"])
-                    #else:
-                    #    processed_predictions = np.where(predictions == -1, 1, 0)
-                    # Calculate thresholds and save it
-                    train_threshold = calculate_threshold_quantile(x_train=X_train, predictions=predictions,
-                                                                   threshold=self.step_config.get("threshold"))
+
+                    recipes_threshold = self.step_config.get("threshold")
+                    if model_type == CustomModels.AUTOENCODER.model_name:
+                        train_threshold = calculate_threshold_quantile(x_train=X_train, predictions=predictions,
+                                                                       threshold=recipes_threshold)
+                    else:
+                        scores = -fitted_estimator.score_samples(copied_raw_X_train)
+                        train_threshold = np.quantile(scores, recipes_threshold)
+
                     mlflow.log_metric("Calculated threshold", train_threshold)
                     model_schema = infer_signature(
                         preprocess_anomaly_data(dataset=raw_X_train, recipe_root=self.recipe_root,
@@ -544,20 +544,12 @@ class TrainAnomalyStep(BaseStep):
                     if self.positive_class is not None:
                         eval_config["pos_label"] = self.positive_class
                     result_save_path = os.path.join(output_directory, f"eval_{dataset_name}")
-                    evaluator = EvaluateAnomalyModel(
-                        model_uri=logged_estimator.model_uri,
-                        dataset=dataset,
-                        label_column=self.target_col,
-                        dataset_name=dataset_name.upper(),
-                        artifacts_path=result_save_path,
-                        root_recipe=self.recipe_root,
-                        extra_metrics=_load_custom_metrics(
-                            self.recipe_root,
-                            self.evaluation_metrics.values(),
-                        ),
-                        threshold=self.step_config["threshold"],
-                        model_type=self.step_config["model_type"]
-                    )
+                    evaluator = EvaluateAnomalyModel(model_uri=logged_estimator.model_uri, dataset=dataset,
+                                                     dataset_name=dataset_name.upper(), root_recipe=self.recipe_root,
+                                                     extra_metrics=_load_custom_metrics(
+                                                         self.recipe_root,
+                                                         self.evaluation_metrics.values(),
+                                                     ))
                     eval_result = evaluator.evaluate_anomaly_model()
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {
@@ -569,11 +561,11 @@ class TrainAnomalyStep(BaseStep):
             processed_validation_df = preprocess_anomaly_data(dataset=raw_validation_df, recipe_root=self.recipe_root,
                                         target_col=self.target_col, is_train_step=True)
             prediction_result = model.predict(processed_validation_df)
-            #if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
-            #    prediction_result = process_predictions(threshold=self.step_config["threshold"],
+            #if model_type == CustomModels.AUTOENCODER.model_name:
+            #    prediction_result = process_predictions(threshold=recipes_threshold,
             #                                            model_input=raw_validation_df,
             #                                            raw_predictions=prediction_result,
-            #                                            model_type=self.step_config["model_type"])
+            #                                            model_type=model_type)
             #else:
             #    prediction_result = np.where(prediction_result == -1, 1, 0)
 
@@ -599,21 +591,23 @@ class TrainAnomalyStep(BaseStep):
                 ].values
             else:
                 prediction_result_for_error = prediction_result
-            error_fn = _get_error_fn(
-                self.recipe,
-                use_probability=use_probability_for_error_rate,
-                positive_class=self.positive_class,
-            )
+            error_fn = _get_error_fn(self.recipe, use_probability=use_probability_for_error_rate,
+                                     positive_class=self.positive_class)
             empty_target = np.empty(processed_validation_df.shape[0], dtype="U4")
             empty_target.fill("None")
             target_data = target_data if self.target_col is not None else empty_target
+            validation_error_scores = None
+            if model_type == CustomModels.ISOLATION_FOREST.model_name:
+                validation_error_scores = -fitted_estimator.score_samples(processed_validation_df)
+            else:
+                validation_error_scores = error_fn(prediction_result_for_error, processed_validation_df)
             pred_and_error_df = pd.DataFrame(
                 {
                     "target": target_data,
                     "prediction": process_predictions(
                         train_threshold, processed_validation_df, prediction_result, self.step_config.get("model_type")
                     ),
-                    "error": error_fn(prediction_result_for_error, processed_validation_df),
+                    "error": validation_error_scores,
                 }
             )
             calibrated_plot = None
@@ -623,11 +617,11 @@ class TrainAnomalyStep(BaseStep):
                                                                               target_col=self.target_col,
                                                                               is_train_step=True)
             raw_train_predictions = model.predict(preprocessed_raw_train_df_without_label)
-            if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
+            if model_type == CustomModels.AUTOENCODER.model_name:
                 train_predictions = process_predictions(threshold=self.step_config["threshold"],
                                                         model_input=raw_train_df_without_label,
                                                         raw_predictions=raw_train_predictions,
-                                                        model_type=self.step_config["model_type"])
+                                                        model_type=model_type)
             else:
                 train_predictions = np.where(raw_train_predictions == -1, 1, 0)
             if isinstance(train_predictions, pd.DataFrame) and {
@@ -672,11 +666,16 @@ class TrainAnomalyStep(BaseStep):
                 predicted_labels = process_predictions(threshold=train_threshold,
                                                        model_input=preprocessed_raw_train_df_without_label,
                                                        raw_predictions=raw_train_predictions,
-                                                       model_type=self.step_config["model_type"])
+                                                       model_type=model_type)
+                train_error_scores = None
+                if  model_type == CustomModels.ISOLATION_FOREST.model_name:
+                    train_error_scores = -fitted_estimator.score_samples(preprocessed_raw_train_df_without_label)
+                else:
+                    train_error_scores = error_fn(raw_train_predictions, preprocessed_raw_train_df_without_label).to_numpy()
                 worst_examples_df = BaseStep._generate_worst_examples_dataframe(
                     dataframe=preprocessed_raw_train_df_without_label,
                     predictions=predicted_labels,
-                    error=error_fn(raw_train_predictions, preprocessed_raw_train_df_without_label).to_numpy(),
+                    error=train_error_scores,
                     target_col=self.target_col,
                     task=self.task
                 )

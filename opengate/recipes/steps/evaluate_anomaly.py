@@ -225,20 +225,12 @@ class EvaluateAnomalyStep(BaseStep):
                     if self.extended_task == "classification/binary":
                         evaluator_config["pos_label"] = self.positive_class
                     result_save_path = os.path.join(output_directory, f"eval_{dataset_name}")
-                    evaluator = EvaluateAnomalyModel(
-                        model_uri=model_uri,
-                        dataset=dataset,
-                        label_column=self.target_col,
-                        dataset_name=dataset_name.upper(),
-                        artifacts_path=result_save_path,
-                        root_recipe=self.recipe_root,
-                        extra_metrics=_load_custom_metrics(
-                            self.recipe_root,
-                            self.evaluation_metrics.values(),
-                        ),
-                        threshold=self.step_config["threshold"],
-                        model_type=self.step_config["model_type"]
-                    )
+                    evaluator = EvaluateAnomalyModel(model_uri=model_uri, dataset=dataset,
+                                                     dataset_name=dataset_name.upper(), root_recipe=self.recipe_root,
+                                                     extra_metrics=_load_custom_metrics(
+                                                         self.recipe_root,
+                                                         self.evaluation_metrics.values(),
+                                                     ))
                     eval_result = evaluator.evaluate_anomaly_model()
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {

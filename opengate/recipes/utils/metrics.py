@@ -72,16 +72,14 @@ BUILTIN_REGRESSION_RECIPE_METRICS = [
 ]
 
 BUILTIN_ANOMALY_RECIPE_METRICS = [
-    RecipeMetric(name="f1_score", greater_is_better=True),
-    RecipeMetric(name="precision_score", greater_is_better=True),
-    RecipeMetric(name="recall_score", greater_is_better=True),
-    RecipeMetric(name="roc_auc_score", greater_is_better=True),
+    RecipeMetric(name="mean_squared_error", greater_is_better=False)
 ]
 
 DEFAULT_METRICS = {
     "regression": "root_mean_squared_error",
     "classification/binary": "f1_score",
     "classification/multiclass": "f1_score_macro",
+    "anomaly": "mean_squared_error"
 }
 
 
