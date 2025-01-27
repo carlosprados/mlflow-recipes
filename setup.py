@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(
-    name="opengate-ai-recipes",
+    name="training-plan-template",
     version="0.1.0",
     author="Carlos Prados",
     author_email="carlos.prados@amplia.es",
@@ -19,10 +19,10 @@ setup(
         "License :: OSI Approved :: Apache Software License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.6",
+    python_requires=">=3.10",
     entry_points={
         "console_scripts": [
-            "opengate-ai-recipes = opengate.recipes.cli:commands",  # Example of adding a CLI entry point
+            "training-plan-template = opengate.recipes.cli:commands",  # Example of adding a CLI entry point
         ],
     },
 )
