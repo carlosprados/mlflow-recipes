@@ -473,20 +473,20 @@ class TrainAnomalyStep(BaseStep):
                     )
                     tempModel = mlflow.pyfunc.load_model(pyfunc_model_tmp_path)
                     copied_raw_X_train = raw_X_train.copy()
-                    predictions = tempModel.predict(copied_raw_X_train)
-
+                    copied_raw_X_train = preprocess_anomaly_data(copied_raw_X_train, self.recipe_root)
                     recipes_threshold = self.step_config.get("threshold")
                     if model_type == CustomModels.AUTOENCODER.model_name:
+                        predictions = tempModel.predict(copied_raw_X_train)
                         train_threshold = calculate_threshold_quantile(x_train=X_train, predictions=predictions,
                                                                        threshold=recipes_threshold)
                     else:
                         scores = -fitted_estimator.score_samples(copied_raw_X_train)
                         train_threshold = np.quantile(scores, recipes_threshold)
+                        predictions = (scores > train_threshold).astype(int)
 
                     mlflow.log_metric("Calculated threshold", train_threshold)
                     model_schema = infer_signature(
-                        preprocess_anomaly_data(dataset=raw_X_train, recipe_root=self.recipe_root,
-                                                target_col=self.target_col, is_train_step=True), predictions)
+                        preprocess_anomaly_data(dataset=raw_X_train, recipe_root=self.recipe_root), predictions)
                     mlflow.pyfunc.save_model(
                         path=model_uri,
                         python_model=wrapped_model,
@@ -548,7 +548,7 @@ class TrainAnomalyStep(BaseStep):
                                                          self.recipe_root,
                                                          self.evaluation_metrics.values(),
                                                      ))
-                    eval_result = evaluator.evaluate_anomaly_model()
+                    eval_result = evaluator.evaluate_anomaly_model(model_type=model_type, threshold=train_threshold)
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {
                         strip_prefix(k, metric_prefix): v
@@ -556,9 +556,8 @@ class TrainAnomalyStep(BaseStep):
                     }
             target_data = raw_validation_df[self.target_col] if self.target_col else pd.Series(dtype=int)
             raw_validation_df = raw_validation_df.drop(self.target_col, axis=1) if self.target_col else raw_validation_df
-            processed_validation_df = preprocess_anomaly_data(dataset=raw_validation_df, recipe_root=self.recipe_root,
-                                        target_col=self.target_col, is_train_step=True)
-            prediction_result = model.predict(processed_validation_df)
+            processed_validation_df = preprocess_anomaly_data(dataset=raw_validation_df, recipe_root=self.recipe_root)
+            prediction_result = model.predict(processed_validation_df) # TODO: bak buraya
             #if model_type == CustomModels.AUTOENCODER.model_name:
             #    prediction_result = process_predictions(threshold=recipes_threshold,
             #                                            model_input=raw_validation_df,
@@ -611,10 +610,8 @@ class TrainAnomalyStep(BaseStep):
             calibrated_plot = None
             raw_train_df_without_label = raw_train_df.drop(self.target_col, axis=1) if self.target_col else raw_train_df
             preprocessed_raw_train_df_without_label = preprocess_anomaly_data(dataset=raw_train_df_without_label,
-                                                                              recipe_root=self.recipe_root,
-                                                                              target_col=self.target_col,
-                                                                              is_train_step=True)
-            raw_train_predictions = model.predict(preprocessed_raw_train_df_without_label)
+                                                                              recipe_root=self.recipe_root)
+            raw_train_predictions = model.predict(preprocessed_raw_train_df_without_label) # TODO: bak buraya
             if model_type == CustomModels.AUTOENCODER.model_name:
                 train_predictions = process_predictions(threshold=self.step_config["threshold"],
                                                         model_input=raw_train_df_without_label,
@@ -1446,14 +1443,17 @@ class TrainAnomalyStep(BaseStep):
             }
             mlflow.set_tags(estimator_tags)
         processed_x_train_sampled = X_train_sampled.copy()
-        predictions = estimator.predict(processed_x_train_sampled)
+        processed_x_train_sampled = preprocess_anomaly_data(processed_x_train_sampled, self.recipe_root)
         if self.step_config["model_type"] == CustomModels.AUTOENCODER.model_name:
+            predictions = estimator.predict(processed_x_train_sampled)
             processed_predictions = process_predictions(threshold=self.step_config["threshold"],
                                                         model_input=processed_x_train_sampled,
                                                         raw_predictions=predictions,
                                                         model_type=self.step_config["model_type"])
         else:
-            processed_predictions = np.where(predictions == -1, 1, 0)
+            scores_X_train_sampled = -estimator.score_samples(processed_x_train_sampled)
+            X_train_sampled = np.quantile(scores_X_train_sampled, self.step_config["threshold"])
+            processed_predictions = (scores_X_train_sampled > X_train_sampled).astype(int)
         estimator_schema = infer_signature(
             X_train_sampled, processed_predictions
         )

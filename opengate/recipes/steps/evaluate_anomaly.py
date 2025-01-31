@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import mlflow
+from mlflow import MlflowClient
 from mlflow.exceptions import MlflowException
 from mlflow.protos.databricks_pb2 import INVALID_PARAMETER_VALUE
 from opengate.recipes.cards import BaseCard
@@ -163,8 +164,7 @@ class EvaluateAnomalyStep(BaseStep):
                 step_name="split",
                 relative_path="test.parquet",
             )
-            test_df = preprocess_anomaly_data(dataset=pd.read_parquet(test_df_path), recipe_root=self.recipe_root,
-                                              target_col=self.target_col)
+            test_df = preprocess_anomaly_data(dataset=pd.read_parquet(test_df_path), recipe_root=self.recipe_root)
             validate_classification_config(
                 self.task, self.positive_class, test_df, self.target_col
             )
@@ -175,7 +175,7 @@ class EvaluateAnomalyStep(BaseStep):
                 relative_path="validation.parquet",
             )
             validation_df = preprocess_anomaly_data(dataset=pd.read_parquet(validation_df_path),
-                                                    recipe_root=self.recipe_root, target_col=self.target_col)
+                                                    recipe_root=self.recipe_root)
 
             run_id_path = get_step_output_path(
                 recipe_root_path=self.recipe_root,
@@ -201,7 +201,7 @@ class EvaluateAnomalyStep(BaseStep):
                 exp_id, f"test_{self.primary_metric}", primary_metric_greater_is_better
             )
 
-            with mlflow.start_run(run_id=run_id):
+            with mlflow.start_run(run_id=run_id) as run:
                 eval_metrics = {}
                 for dataset_name, dataset, evaluator_config in (
                     (
@@ -231,7 +231,12 @@ class EvaluateAnomalyStep(BaseStep):
                                                          self.recipe_root,
                                                          self.evaluation_metrics.values(),
                                                      ))
-                    eval_result = evaluator.evaluate_anomaly_model()
+                    # Get train threshold
+                    client = MlflowClient()
+                    train_treshold = client.get_metric_history(run_id, "Calculated threshold")[-1].value
+
+                    eval_result = evaluator.evaluate_anomaly_model(model_type=self.step_config.get("model_type"),
+                                                                   threshold=train_treshold)
                     eval_result.save(result_save_path)
                     eval_metrics[dataset_name] = {
                         transform_multiclass_metric(

@@ -9,9 +9,8 @@ from opengate.recipes.utils.metrics import BUILTIN_ANOMALY_RECIPE_METRICS
 from pandas import DataFrame
 import numpy as np
 
-from mlflow.pyfunc import load_model
+import mlflow
 from mlflow.models import EvaluationResult, EvaluationMetric
-from mlflow import log_metric
 
 from importlib import import_module
 import importlib.util as importlib_utils
@@ -31,10 +30,15 @@ class EvaluateAnomalyModel:
         self.extra_metrics = extra_metrics
 
 
-    def evaluate_anomaly_model(self):
+    def evaluate_anomaly_model(self, model_type: str, threshold: np.floating):
         # Load model
-        model = load_model(self.model_uri)
-        raw_predictions = model.predict(self.dataset)
+        if model_type == CustomModels.ISOLATION_FOREST.model_name:
+            model = mlflow.sklearn.load_model(self.model_uri)
+            scores = -model.score_samples(self.dataset)
+            raw_predictions = (scores > threshold).astype(int)
+        else:
+            model = mlflow.pyfunc.load_model(self.model_uri)
+            raw_predictions = model.predict(self.dataset)
         artifacts = {}
         calculated_metrics = {}
 
@@ -44,7 +48,7 @@ class EvaluateAnomalyModel:
                 imported_metric = getattr(sklearn_metrics, metric.name)
                 score = imported_metric(self.dataset, raw_predictions)
                 calculated_metrics[metric.name] = score
-                log_metric(f"{self.dataset_name}_{metric.name}", score)
+                mlflow.log_metric(f"{self.dataset_name}_{metric.name}", score)
             except AttributeError as ae:
                 _logger.error(f"Metric '{metric.name}' not found in sklearn.metrics: {ae}")
             except Exception as e:
@@ -65,13 +69,13 @@ class EvaluateAnomalyModel:
             spec.loader.exec_module(module)
             metric_function = getattr(module, metric.name)
             extra_metric_score = metric_function(self.dataset, predictions)
-            log_metric(f"{self.dataset_name}_{metric.name}", extra_metric_score)
+            mlflow.log_metric(f"{self.dataset_name}_{metric.name}", extra_metric_score)
             extra_calculated_metrics[metric.name] = extra_metric_score
 
         return extra_calculated_metrics
 
 
-def preprocess_anomaly_data(dataset: pd.DataFrame, recipe_root: str, target_col: str, is_train_step=False) -> pd.DataFrame:
+def preprocess_anomaly_data(dataset: pd.DataFrame, recipe_root: str) -> pd.DataFrame:
     from opengate.recipes.utils.execution import get_step_output_path
     import joblib
     transformer_path = get_step_output_path(
