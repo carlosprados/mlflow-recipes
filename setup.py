@@ -25,4 +25,5 @@ setup(
             "training-plan-template = opengate.recipes.cli:commands",  # Example of adding a CLI entry point
         ],
     },
+    include_package_data=True,  # Include non-Python files specified in MANIFEST.in
 )

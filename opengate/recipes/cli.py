@@ -1,9 +1,13 @@
+from time import sleep
+
 import click
 
 from mlflow.environment_variables import MLFLOW_RECIPES_PROFILE
 from opengate.recipes import Recipe
+from opengate.recipes.cli_custom.generator import generate_local_dockerfile
+from opengate.recipes.cli_custom.trigger import build_docker
 
-_CLI_ARG_RECIPE_PROFILE = click.option(
+_CLI_ARG_TRAINING_TEMPLATE_PROFILE = click.option(
     "--profile",
     "-p",
     envvar=MLFLOW_RECIPES_PROFILE.name,
@@ -21,7 +25,7 @@ _CLI_ARG_RECIPE_PROFILE = click.option(
 @click.group("recipes")
 def commands():
     """
-    Run MLflow Recipes and inspect recipe results.
+    Run Training plan templates and inspect its results.
     """
 
 
@@ -34,7 +38,7 @@ def commands():
     required=False,
     help="The name of the recipe step to run.",
 )
-@_CLI_ARG_RECIPE_PROFILE
+@_CLI_ARG_TRAINING_TEMPLATE_PROFILE
 def run(step, profile):
     """
     Run the full recipe, or run a particular recipe step if specified, producing
@@ -57,7 +61,7 @@ def run(step, profile):
     required=False,
     help="The name of the recipe step for which to remove cached outputs.",
 )
-@_CLI_ARG_RECIPE_PROFILE
+@_CLI_ARG_TRAINING_TEMPLATE_PROFILE
 def clean(step, profile):
     """
     Remove all recipe outputs from the cache, or remove the cached outputs of a particular
@@ -80,7 +84,7 @@ def clean(step, profile):
     required=False,
     help="The name of the recipe step to inspect.",
 )
-@_CLI_ARG_RECIPE_PROFILE
+@_CLI_ARG_TRAINING_TEMPLATE_PROFILE
 def inspect(step, profile):
     """
     Display a visual overview of the recipe graph, or display a summary of results from a
@@ -101,10 +105,20 @@ def inspect(step, profile):
     required=True,
     help="The name of the artifact to retrieve.",
 )
-@_CLI_ARG_RECIPE_PROFILE
+@_CLI_ARG_TRAINING_TEMPLATE_PROFILE
 def get_artifact(profile, artifact):
     """
     Get the location of an artifact output from the recipe.
     """
     artifact_location = Recipe(profile=profile)._get_artifact(artifact).path()
     click.echo(artifact_location)
+
+@commands.command("generate-dockerfile", short_help=("Generates dockerfile"))
+def generate_dockerfile():
+    generate_local_dockerfile("generate-dockerfile")
+
+# TODO: Not finished this part
+@commands.command("build-training-plan", short_help=("Builds training plan to run in a docker image"))
+def build_dockerfile():
+    generate_local_dockerfile("build-training-plan")
+    build_docker("build-training-plan")

@@ -1,2 +1,4 @@
 include README.md
 include LICENSE
+include opengate/recipes/cards/templates/base.html
+include opengate/recipes/resources/recipe_dag_template.html

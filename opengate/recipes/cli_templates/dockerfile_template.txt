@@ -1,0 +1,14 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+COPY {template_root_dir} /app/training-plan-template
+
+RUN pip install /app/training-plan-template
+
+COPY {training_plan_name} /app/{training_plan_name}
+
+WORKDIR /app/{training_plan_name}
+
+# Run the command
+CMD ["training-plan-template", "run", "--profile", "local"]
