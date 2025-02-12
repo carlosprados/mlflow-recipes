@@ -37,7 +37,7 @@ def get_container_data(ingest_config: Dict[str, str]):
     if container_loc is not None or container_loc != "":
         filename = container_loc.split("/")[-1]
         data_target_loc = os.path.join(os.getcwd(), "data", filename)
-        shutil.move(container_loc, data_target_loc)
+        shutil.copy(container_loc, data_target_loc)
 
 
 class CreateMlflowFiles:
