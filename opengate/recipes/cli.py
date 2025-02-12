@@ -4,8 +4,8 @@ import click
 
 from mlflow.environment_variables import MLFLOW_RECIPES_PROFILE
 from opengate.recipes import Recipe
-from opengate.recipes.cli_custom.generator import generate_local_dockerfile
-from opengate.recipes.cli_custom.trigger import build_docker
+from opengate.recipes.cli_custom.generator import generate_local_container_files
+from opengate.recipes.cli_custom.trigger import build_run_containers, run_trainer
 
 _CLI_ARG_TRAINING_TEMPLATE_PROFILE = click.option(
     "--profile",
@@ -113,12 +113,15 @@ def get_artifact(profile, artifact):
     artifact_location = Recipe(profile=profile)._get_artifact(artifact).path()
     click.echo(artifact_location)
 
-@commands.command("generate-dockerfile", short_help=("Generates dockerfile"))
-def generate_dockerfile():
-    generate_local_dockerfile("generate-dockerfile")
+@commands.command("generate-container-files", short_help=("Generates Dockerfile and docker-compose file"))
+def generate_container_files():
+    generate_local_container_files("generate-dockerfile")
 
-# TODO: Not finished this part
-@commands.command("build-training-plan", short_help=("Builds training plan to run in a docker image"))
+@commands.command("build-training-containers", short_help=("Builds containers and starts training"))
 def build_dockerfile():
-    generate_local_dockerfile("build-training-plan")
-    build_docker("build-training-plan")
+    generate_local_container_files("build-training-containers")
+    build_run_containers("build-training-containers")
+
+@commands.command("run-training-containers", short_help=("runs training container"))
+def build_dockerfile():
+    run_trainer()

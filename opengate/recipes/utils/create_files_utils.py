@@ -1,4 +1,7 @@
 import os
+import logging
+from typing import Dict
+import shutil
 
 from opengate.recipes.steps.ingest import IngestStep
 from opengate.recipes.steps.split import SplitStep
@@ -14,17 +17,27 @@ from opengate.recipes.steps.evaluate_anomaly import EvaluateAnomalyStep
 from opengate.recipes.steps.transform_anomaly import TransformAnomalyStep
 from opengate.recipes.task_enum import MLTask
 
+_logger = logging.getLogger(__name__)
+
 def check_and_create_file(file_path: str):
     if not os.path.exists(path=file_path):
         os.makedirs(os.path.dirname(file_path), exist_ok=True)
         # Create an empty file
-        with open(file_path, 'w') as file:
+        with open(file_path, 'w'):
             pass
 
 
 def check_and_create_folder(folder_path: str):
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
+
+
+def get_container_data(ingest_config: Dict[str, str]):
+    container_loc = ingest_config.get("container_location")
+    if container_loc is not None or container_loc != "":
+        filename = container_loc.split("/")[-1]
+        data_target_loc = os.path.join(os.getcwd(), "data", filename)
+        shutil.move(container_loc, data_target_loc)
 
 
 class CreateMlflowFiles:
@@ -40,8 +53,9 @@ class CreateMlflowFiles:
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "ingest/outputs")
         check_and_create_folder(output_dir)
         ingest_step = IngestStep.from_step_config_path(step_config_path=ingest_conf, recipe_root=self.project_base_dir)
+        get_container_data(ingest_step.step_config)
         ingest_step.run(output_directory=output_dir)
-        print("Ingest step completed")
+        _logger.info("Ingest step completed")
 
     def split(self):
         split_conf = os.path.join(self.mlflow_recipe_steps_dir, "split/conf.yaml")
@@ -53,7 +67,7 @@ class CreateMlflowFiles:
         }.get(self.template, SplitStep)
         split_step = step_class.from_step_config_path(step_config_path=split_conf, recipe_root=self.project_base_dir)
         split_step.run(output_directory=output_dir)
-        print("Split step completed")
+        _logger.info("Split step completed")
 
     def transform(self):
         transform_conf = os.path.join(self.mlflow_recipe_steps_dir, "transform/conf.yaml")
@@ -66,7 +80,7 @@ class CreateMlflowFiles:
         transform_step = step_class.from_step_config_path(step_config_path=transform_conf,
                                                           recipe_root=self.project_base_dir)
         transform_step.run(output_directory=output_dir)
-        print("Transform step completed")
+        _logger.info("Transform step completed")
 
     def train(self):
         train_conf = os.path.join(self.mlflow_recipe_steps_dir, "train/conf.yaml")
@@ -80,7 +94,7 @@ class CreateMlflowFiles:
         train_step = step_class.from_step_config_path(step_config_path=train_conf, recipe_root=self.project_base_dir)
 
         train_step.run(output_directory=output_dir)
-        print("Train step completed")
+        _logger.info("Train step completed")
 
     def evaluate(self):
         evaluate_conf = os.path.join(self.mlflow_recipe_steps_dir, "evaluate/conf.yaml")
@@ -94,7 +108,7 @@ class CreateMlflowFiles:
         evaluate_step = step_class.from_step_config_path(step_config_path=evaluate_conf, recipe_root=self.project_base_dir)
 
         evaluate_step.run(output_directory=output_dir)
-        print("Evaluate step completed")
+        _logger.info("Evaluate step completed")
 
     def register(self):
         register_conf = os.path.join(self.mlflow_recipe_steps_dir, "register/conf.yaml")
@@ -105,7 +119,7 @@ class CreateMlflowFiles:
         check_and_create_file(run_id_file)
         register_step = RegisterStep.from_step_config_path(step_config_path=register_conf, recipe_root=self.project_base_dir)
         register_step.run(output_directory=output_dir)
-        print("Register step completed")
+        _logger.info("Register step completed")
 
     def ingest_scoring(self):
         ingest_scoring_conf = os.path.join(self.mlflow_recipe_steps_dir, "ingest_scoring/conf.yaml")
@@ -124,7 +138,7 @@ class CreateMlflowFiles:
             )
             ingest_scoring_step.run(output_directory=output_dir)
             message = "Ingest scoring step completed"
-        print(message)
+        _logger.info(message)
 
     def predict(self):
         predict_conf = os.path.join(self.mlflow_recipe_steps_dir, "predict/conf.yaml")
@@ -133,7 +147,7 @@ class CreateMlflowFiles:
         check_and_create_folder(output_dir)
         predict_step = PredictStep.from_step_config_path(step_config_path=predict_conf, recipe_root=self.project_base_dir)
         predict_step.run(output_directory=output_dir)
-        print("Predict step completed")
+        _logger.info("Predict step completed")
 
     # Clean function to remove generated output files
     def clean(self):
@@ -151,9 +165,9 @@ class CreateMlflowFiles:
         ]
         for dir_path in output_dirs:
             if os.path.exists(dir_path):
-                print(f"Removing directory: {dir_path}")
+                _logger.info(f"Removing directory: {dir_path}")
                 os.system(f"rm -rf {dir_path}")
-        print("Clean completed")
+        _logger.info("Clean completed")
 
     def start_creating(self):
         match self.target:
