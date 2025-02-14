@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   training-container:
     build:
@@ -11,9 +13,7 @@ services:
       - "5001:5000"
     environment:
       - MLFLOW_TRACKING_URI=http://training-container:5001
-    command: >
-      sh -c "chmod -R 777 /app/{plan_folder_name}/metadata/mlflow &&
-             training-plan-template run --profile local"
+      - MLFLOW_ARTIFACT_ROOT=/app/{plan_folder_name}/metadata
     networks:
       - mlflow_network
 
@@ -23,6 +23,7 @@ services:
     working_dir: /app
     environment:
       - MLFLOW_TRACKING_URI=http://training-container:5001
+      - MLFLOW_ARTIFACT_ROOT=/app/{plan_folder_name}/metadata
     volumes:
       - ./metadata:/app/{plan_folder_name}/metadata
     ports:
@@ -30,8 +31,11 @@ services:
     command: >
       sh -c "mkdir -p /app/{plan_folder_name}/metadata/mlflow &&
              chmod -R 777 /app/{plan_folder_name}/metadata/mlflow &&
+             chmod -R 777 /app/{plan_folder_name}/metadata/mlflow/mlartifacts &&
              pip install mlflow=={mlflow_version} &&
              mlflow ui --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:////app/{plan_folder_name}/metadata/mlflow/mlruns.db --default-artifact-root /app/{plan_folder_name}/metadata"
+    depends_on:
+      - training-container
     networks:
       - mlflow_network
 

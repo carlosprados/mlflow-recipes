@@ -14,6 +14,4 @@ COPY {training_plan_name}/recipe.yaml /app/{training_plan_name}/recipe.yaml
 
 WORKDIR /app/{training_plan_name}
 
-RUN chmod -R 777 /app/{training_plan_name}/metadata/mlflow
-
 CMD ["training-plan-template", "run", "--profile", "local"]

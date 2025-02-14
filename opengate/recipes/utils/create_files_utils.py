@@ -32,14 +32,6 @@ def check_and_create_folder(folder_path: str):
         os.makedirs(folder_path)
 
 
-def get_container_data(ingest_config: Dict[str, str]):
-    container_loc = ingest_config.get("container_location")
-    if container_loc is not None and container_loc != "":
-        filename = container_loc.split("/")[-1]
-        data_target_loc = os.path.join(os.getcwd(), "data", filename)
-        shutil.copy(container_loc, data_target_loc)
-
-
 class CreateMlflowFiles:
     def __init__(self, mlflow_recipe_dir: str, project_base_dir: str, target: str, template: str):
         self.mlflow_recipe_steps_dir = "/".join([mlflow_recipe_dir, "steps"])
@@ -53,7 +45,6 @@ class CreateMlflowFiles:
         output_dir = os.path.join(self.mlflow_recipe_steps_dir, "ingest/outputs")
         check_and_create_folder(output_dir)
         ingest_step = IngestStep.from_step_config_path(step_config_path=ingest_conf, recipe_root=self.project_base_dir)
-        get_container_data(ingest_step.step_config)
         ingest_step.run(output_directory=output_dir)
         _logger.info("Ingest step completed")
 
