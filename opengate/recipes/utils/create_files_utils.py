@@ -34,7 +34,7 @@ def check_and_create_folder(folder_path: str):
 
 def get_container_data(ingest_config: Dict[str, str]):
     container_loc = ingest_config.get("container_location")
-    if container_loc is not None or container_loc != "":
+    if container_loc is not None and container_loc != "":
         filename = container_loc.split("/")[-1]
         data_target_loc = os.path.join(os.getcwd(), "data", filename)
         shutil.copy(container_loc, data_target_loc)
