@@ -4,8 +4,8 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-COPY {template_root_dir} /app/training-plan-template
-RUN pip install /app/training-plan-template
+COPY {template_root_dir} /app/training-template
+RUN pip install /app/training-template
 
 COPY {training_plan_name}/data /app/{training_plan_name}/data
 COPY {training_plan_name}/profiles /app/{training_plan_name}/profiles
@@ -14,4 +14,4 @@ COPY {training_plan_name}/recipe.yaml /app/{training_plan_name}/recipe.yaml
 
 WORKDIR /app/{training_plan_name}
 
-CMD ["training-plan-template", "run", "--profile", "local"]
+CMD ["training-template", "run", "--profile", "local"]

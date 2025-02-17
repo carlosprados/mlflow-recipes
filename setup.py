@@ -4,7 +4,7 @@ with open('requirements.txt') as f:
     requirements = f.read().splitlines()
 
 setup(
-    name="training-plan-template",
+    name="training-template",
     version="0.1.0",
     author="Carlos Prados",
     author_email="carlos.prados@amplia.es",
@@ -22,7 +22,7 @@ setup(
     python_requires=">=3.10",
     entry_points={
         "console_scripts": [
-            "training-plan-template = opengate.recipes.cli:commands",  # Example of adding a CLI entry point
+            "training-template = opengate.recipes.cli:commands",  # Example of adding a CLI entry point
         ],
     },
     include_package_data=True,  # Include non-Python files specified in MANIFEST.in
